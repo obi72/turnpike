@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { getStats, listOwners, suspendOwner, unsuspendOwner, closeOwner, type Stats, type Owner } from "@/lib/api";
 
 export default function AdminDashboard() {
-  const router  = useRouter();
   const [stats, setStats]     = useState<Stats | null>(null);
   const [owners, setOwners]   = useState<Owner[]>([]);
   const [search, setSearch]   = useState("");
@@ -14,10 +12,8 @@ export default function AdminDashboard() {
   const [acting, setActing]   = useState<string | null>(null);
 
   useEffect(() => {
-    const secret = sessionStorage.getItem("admin_secret");
-    if (!secret) { router.replace("/"); return; }
     load();
-  }, [router]);
+  }, []);
 
   async function load(q?: string) {
     setLoading(true);
@@ -25,7 +21,7 @@ export default function AdminDashboard() {
       const [s, o] = await Promise.all([getStats(), listOwners(q)]);
       setStats(s);
       setOwners(o);
-    } catch { router.replace("/"); }
+    } catch { /* handle error */ }
     finally { setLoading(false); }
   }
 
@@ -46,9 +42,7 @@ export default function AdminDashboard() {
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h1 style={{ fontSize: 20, fontWeight: 600 }}>Turnpike Admin</h1>
-        <button className="secondary" onClick={() => { sessionStorage.clear(); router.push("/"); }}>
-          Sign out
-        </button>
+        <span style={{ fontSize: 12, color: "var(--text-3)" }}>admin</span>
       </div>
 
       {/* Stats */}

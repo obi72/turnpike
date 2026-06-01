@@ -1,21 +1,11 @@
-// Admin API client — calls the admin Cloudflare Worker via SUPER_ADMIN_SECRET.
-// This runs server-side in Next.js API routes to keep the secret out of the browser.
-
-const ADMIN_API_URL = process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "https://admin-api.trnpk.net";
-
-function getSecret(): string {
-  if (typeof window !== "undefined") {
-    return sessionStorage.getItem("admin_secret") ?? "";
-  }
-  return "";
-}
+// Admin API client — all calls go through the Next.js proxy at /api/admin/*
+// The proxy adds the SUPER_ADMIN_SECRET server-side. Nothing secret in the browser.
 
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res  = await fetch(`${ADMIN_API_URL}${path}`, {
+  const res  = await fetch(`/api/admin${path}`, {
     ...init,
     headers: {
-      "Content-Type":  "application/json",
-      Authorization:   `Bearer ${getSecret()}`,
+      "Content-Type": "application/json",
       ...((init.headers as Record<string, string>) ?? {}),
     },
   });
@@ -24,17 +14,17 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
-export const getStats        = ()              => apiFetch<Stats>("/api/admin/stats");
+export const getStats        = ()               => apiFetch<Stats>("/stats");
 export const listOwners      = (search?: string) =>
-  apiFetch<Owner[]>(`/api/admin/owners${search ? `?search=${search}` : ""}`);
-export const getOwner        = (id: string)    => apiFetch<OwnerDetail>(`/api/admin/owners/${id}`);
-export const deleteFile      = (slug: string)  => apiFetch<{ ok: boolean }>(`/api/admin/files/${slug}`, { method: "DELETE" });
-export const deleteAllFiles  = (id: string)    => apiFetch<{ ok: boolean; deleted: number }>(`/api/admin/owners/${id}/files`, { method: "DELETE" });
-export const suspendOwner    = (id: string)    => apiFetch<{ ok: boolean }>(`/api/admin/owners/${id}/suspend`, { method: "POST" });
-export const unsuspendOwner  = (id: string)    => apiFetch<{ ok: boolean }>(`/api/admin/owners/${id}/unsuspend`, { method: "POST" });
-export const closeOwner      = (id: string)    => apiFetch<{ ok: boolean }>(`/api/admin/owners/${id}`, { method: "DELETE" });
+  apiFetch<Owner[]>(`/owners${search ? `?search=${encodeURIComponent(search)}` : ""}`);
+export const getOwner        = (id: string)     => apiFetch<OwnerDetail>(`/owners/${id}`);
+export const deleteFile      = (slug: string)   => apiFetch<{ ok: boolean }>(`/files/${slug}`, { method: "DELETE" });
+export const deleteAllFiles  = (id: string)     => apiFetch<{ ok: boolean; deleted: number }>(`/owners/${id}/files`, { method: "DELETE" });
+export const suspendOwner    = (id: string)     => apiFetch<{ ok: boolean }>(`/owners/${id}/suspend`, { method: "POST" });
+export const unsuspendOwner  = (id: string)     => apiFetch<{ ok: boolean }>(`/owners/${id}/unsuspend`, { method: "POST" });
+export const closeOwner      = (id: string)     => apiFetch<{ ok: boolean }>(`/owners/${id}`, { method: "DELETE" });
 export const updateSlots     = (id: string, newLimit: number) =>
-  apiFetch<{ ok: boolean }>(`/api/admin/owners/${id}/slots`, { method: "PATCH", body: JSON.stringify({ newLimit }) });
+  apiFetch<{ ok: boolean }>(`/owners/${id}/slots`, { method: "PATCH", body: JSON.stringify({ newLimit }) });
 
 export interface Stats {
   totalOwners:    number;
@@ -55,11 +45,11 @@ export interface OwnerDetail extends Owner {
 }
 
 export interface FileEntry {
-  slug:           string;
-  fileName:       string;
-  fileSize:       number;
-  price:          string;
-  createdAt:      number;
+  slug:            string;
+  fileName:        string;
+  fileSize:        number;
+  price:           string;
+  createdAt:       number;
   daysUntilDelete: number;
-  payUrl:         string;
+  payUrl:          string;
 }

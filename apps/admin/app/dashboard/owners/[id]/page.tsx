@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+
 import { getOwner, deleteFile, deleteAllFiles, suspendOwner, unsuspendOwner, updateSlots, closeOwner, type OwnerDetail } from "@/lib/api";
 
 export default function OwnerDetailPage() {
@@ -14,9 +15,8 @@ export default function OwnerDetailPage() {
   const [acting, setActing]   = useState(false);
 
   useEffect(() => {
-    if (!sessionStorage.getItem("admin_secret")) { router.replace("/"); return; }
     load();
-  }, [id, router]);
+  }, [id]);
 
   async function load() {
     setLoading(true);
