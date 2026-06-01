@@ -21,8 +21,7 @@ export function useWallet() {
 
   // Subscribe to auth state changes
   useEffect(() => {
-    const unsub = onAuthStateChange((u) => setUser(u ?? null));
-    return () => unsub?.();
+    onAuthStateChange((u) => setUser(u ?? null));
   }, []);
 
   // Derive wallet address from user's EVM accounts
