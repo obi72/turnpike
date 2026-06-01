@@ -40,4 +40,9 @@ app.use("/upload",     uploadRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 
-app.listen(PORT, () => console.log(`Turnpike backend on :${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Turnpike backend on :${PORT}`);
+  console.log(`SUPABASE_URL set: ${!!process.env.SUPABASE_URL}`);
+  console.log(`SUPABASE_SERVICE_KEY set: ${!!process.env.SUPABASE_SERVICE_KEY}`);
+  console.log(`JWT_SECRET set: ${!!process.env.JWT_SECRET}`);
+});
