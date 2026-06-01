@@ -3,11 +3,14 @@
 import { useState, useEffect } from "react";
 import { useWallet } from "@/hooks/useWallet";
 
-const CDP_PROJECT_ID = process.env.NEXT_PUBLIC_CDP_PROJECT_ID ?? "";
-
 export default function WalletHome() {
-  const { address, isLoggedIn, login, logout, getUsdcBalance } = useWallet();
+  const {
+    isLoggedIn, otpSent, loading, error,
+    address, login, verifyOtp, logout, getUsdcBalance,
+  } = useWallet();
 
+  const [email, setEmail]     = useState("");
+  const [otp, setOtp]         = useState("");
   const [balance, setBalance] = useState<number | null>(null);
   const [topup, setTopup]     = useState(5);
 
@@ -15,15 +18,24 @@ export default function WalletHome() {
     if (isLoggedIn) getUsdcBalance().then(setBalance);
   }, [isLoggedIn]);
 
-  function openOnramp() {
+  function openStripeOnramp() {
     if (!address) return;
-    const url =
-      `https://pay.coinbase.com/buy/select-asset` +
-      `?appId=${CDP_PROJECT_ID}` +
-      `&addresses={"${address}":["base"]}` +
-      `&assets=["USDC"]` +
-      `&presetFiatAmount=${topup}`;
-    window.open(url, "_blank", "width=480,height=640");
+    // Stripe Crypto Onramp — öffnet checkout in einem Popup
+    const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
+    const params = new URLSearchParams({
+      transaction_details__wallet_addresses__ethereum: address,
+      transaction_details__lock_wallet_address: "true",
+      transaction_details__supported_destination_networks: "base",
+      transaction_details__supported_destination_currencies: "usdc",
+      transaction_details__destination_currency: "usdc",
+      transaction_details__destination_network: "base",
+      transaction_details__destination_amount: String(topup),
+    });
+    window.open(
+      `https://crypto.link.com?${params.toString()}`,
+      "stripe-onramp",
+      "width=480,height=700",
+    );
   }
 
   // ── Not logged in ──────────────────────────────────────────
@@ -32,15 +44,64 @@ export default function WalletHome() {
       <div style={{ maxWidth: 360, margin: "0 auto", padding: "60px 20px" }}>
         <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 4 }}>Turnpike</h1>
         <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 32 }}>
-          Pay for digital content in seconds.
-          No seed phrase needed.
+          Pay for digital content in seconds — no app required.
         </p>
-        <button onClick={() => login()}>
-          Connect Wallet
-        </button>
-        <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 10, textAlign: "center" }}>
-          Uses Coinbase Smart Wallet — create one with just your email.
-        </p>
+
+        {!otpSent ? (
+          <>
+            <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>Email address</p>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              onKeyDown={e => e.key === "Enter" && login(email)}
+              style={{ marginBottom: 12 }}
+            />
+            <button onClick={() => login(email)} disabled={loading || !email}>
+              {loading ? "Sending code…" : "Continue"}
+            </button>
+            <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 10, textAlign: "center" }}>
+              We&apos;ll send a one-time code. No password needed.
+            </p>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>
+              Code sent to <strong>{email}</strong>
+            </p>
+            <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>6-digit code</p>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={e => setOtp(e.target.value)}
+              placeholder="123456"
+              onKeyDown={e => e.key === "Enter" && verifyOtp(otp)}
+              style={{
+                letterSpacing: "0.3em",
+                fontFamily: "var(--mono)",
+                textAlign: "center",
+                marginBottom: 12,
+              }}
+            />
+            <button onClick={() => verifyOtp(otp)} disabled={loading || otp.length < 6}>
+              {loading ? "Verifying…" : "Confirm"}
+            </button>
+            <button
+              className="ghost"
+              onClick={() => { setOtpSent(false); setOtp(""); }}
+              style={{ marginTop: 8, fontSize: 12 }}
+            >
+              ← Back
+            </button>
+          </>
+        )}
+
+        {error && (
+          <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 10 }}>{error}</p>
+        )}
       </div>
     );
   }
@@ -48,9 +109,16 @@ export default function WalletHome() {
   // ── Logged in ──────────────────────────────────────────────
   return (
     <div style={{ maxWidth: 380, margin: "0 auto", padding: "40px 20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between",
+        alignItems: "center", marginBottom: 24,
+      }}>
         <h1 style={{ fontSize: 20, fontWeight: 600 }}>Turnpike</h1>
-        <button className="ghost" onClick={() => logout()} style={{ width: "auto", padding: "6px 12px", fontSize: 12 }}>
+        <button
+          className="ghost"
+          onClick={logout}
+          style={{ width: "auto", padding: "6px 12px", fontSize: 12 }}
+        >
           Sign out
         </button>
       </div>
@@ -60,41 +128,49 @@ export default function WalletHome() {
         background: "var(--bg-2)", borderRadius: "var(--radius)",
         padding: 24, textAlign: "center", marginBottom: 16,
       }}>
-        <p style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>Balance</p>
+        <p style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>Available balance</p>
         <p style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-1px" }}>
           {balance !== null ? `$${balance.toFixed(2)}` : "…"}
         </p>
         <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4, fontFamily: "var(--mono)" }}>
-          {address?.slice(0, 6)}…{address?.slice(-4)} · Base
+          {address?.slice(0, 6)}…{address?.slice(-4)}
         </p>
       </div>
 
-      {/* Top-up */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        {[2, 5, 10, 20].map(amt => (
-          <button key={amt} onClick={() => setTopup(amt)} style={{
-            flex: 1, padding: "8px 0", fontSize: 13,
-            background: topup === amt ? "var(--accent)" : "var(--bg-2)",
-            color:      topup === amt ? "#fff" : "var(--text-2)",
-            border:     topup === amt ? "none" : "0.5px solid var(--border-2)",
-          }}>
+      {/* Add funds */}
+      <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 8 }}>Add funds with card</p>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        {[5, 10, 20, 50].map(amt => (
+          <button
+            key={amt}
+            onClick={() => setTopup(amt)}
+            style={{
+              flex: 1, padding: "8px 0", fontSize: 13,
+              background: topup === amt ? "var(--accent)" : "var(--bg-2)",
+              color:      topup === amt ? "#fff"         : "var(--text-2)",
+              border:     topup === amt ? "none"         : "0.5px solid var(--border-2)",
+            }}
+          >
             ${amt}
           </button>
         ))}
       </div>
-      <button onClick={openOnramp} style={{ marginBottom: 24 }}>
-        Add ${topup} with card
+      <button onClick={openStripeOnramp} style={{ marginBottom: 28 }}>
+        Add ${topup}
       </button>
 
-      {/* How it works */}
+      {/* How payments work */}
       <div style={{ background: "var(--bg-2)", borderRadius: "var(--radius)", padding: 16 }}>
         <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 10 }}>How payments work</p>
         {[
           "Visit any Turnpike pay link",
-          "Your wallet pays automatically",
+          "Payment is processed automatically",
           "Content unlocks in under 5 seconds",
         ].map((t, i) => (
-          <div key={i} style={{ display: "flex", gap: 10, marginBottom: 6, fontSize: 12, color: "var(--text-2)" }}>
+          <div
+            key={i}
+            style={{ display: "flex", gap: 10, marginBottom: 6, fontSize: 12, color: "var(--text-2)" }}
+          >
             <span style={{ color: "var(--accent)", fontWeight: 500 }}>{i + 1}.</span>
             <span>{t}</span>
           </div>

@@ -1,42 +1,79 @@
 "use client";
 
-import { useAccount, useConnect, useDisconnect, useBalance } from "wagmi";
-import { coinbaseWallet } from "wagmi/connectors";
+import {
+  useCurrentUser,
+  useSignInWithEmail,
+  useVerifyEmailOTP,
+  useSignOut,
+  useEvmAddress,
+} from "@coinbase/cdp-hooks";
+import { useState } from "react";
 
-const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`;
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 export function useWallet() {
-  const { address, isConnected } = useAccount();
-  const { connect }  = useConnect();
-  const { disconnect } = useDisconnect();
+  const { user }            = useCurrentUser();
+  const { evmAddress }      = useEvmAddress();
+  const { signInWithEmail } = useSignInWithEmail();
+  const { verifyEmailOTP }  = useVerifyEmailOTP();
+  const { signOut }         = useSignOut();
 
-  const { data: usdcBalance } = useBalance({
-    address,
-    token: USDC_ADDRESS,
-  });
+  const [flowId, setFlowId]   = useState<string | null>(null);
+  const [otpSent, setOtpSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
 
-  function login() {
-    connect({
-      connector: coinbaseWallet({
-        appName: "Turnpike",
-        preference: "smartWalletOnly",
-      }),
-    });
+  async function login(email: string) {
+    setLoading(true); setError(null);
+    try {
+      const { flowId } = await signInWithEmail({ email });
+      setFlowId(flowId);
+      setOtpSent(true);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifyOtp(otp: string) {
+    if (!flowId) return;
+    setLoading(true); setError(null);
+    try {
+      await verifyEmailOTP({ flowId, otp });
+      setOtpSent(false);
+      setFlowId(null);
+    } catch {
+      setError("Incorrect code — please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function getUsdcBalance(): Promise<number> {
-    if (!usdcBalance) return 0;
-    return parseFloat(usdcBalance.formatted);
+    if (!evmAddress) return 0;
+    try {
+      const res  = await fetch(
+        `https://api.basescan.org/api?module=account&action=tokenbalance` +
+        `&contractaddress=${USDC_ADDRESS}&address=${evmAddress}&tag=latest`,
+      );
+      const data = await res.json();
+      return parseFloat(data.result ?? "0") / 1e6;
+    } catch {
+      return 0;
+    }
   }
 
   return {
-    address,
-    isLoggedIn: isConnected,
-    otpSent:    false,
-    loading:    false,
-    error:      null,
+    user,
+    address:    evmAddress,
+    isLoggedIn: !!user,
+    otpSent,
+    loading,
+    error,
     login,
-    logout:     disconnect,
+    verifyOtp,
+    logout:         signOut,
     getUsdcBalance,
   };
 }
