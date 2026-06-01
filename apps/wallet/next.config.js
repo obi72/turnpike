@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
 module.exports = {
-  webpack: (config) => {
-    return config;
-  },
+  transpilePackages: [
+    "@coinbase/cdp-core",
+    "@coinbase/cdp-hooks",
+    "@coinbase/cdp-react",
+    "x402",
+  ],
   async headers() {
     return [
       {
