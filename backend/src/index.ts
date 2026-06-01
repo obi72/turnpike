@@ -25,10 +25,12 @@ app.use(cors({
   credentials: true,
 }));
 
+app.use(express.json({ limit: "1mb" }));
+
 // CDP API proxy — bypasses browser CORS restrictions
-app.all("/cdp-proxy/*", async (req, res) => {
-  const cdpPath = req.path.replace("/cdp-proxy", "");
-  const cdpUrl  = `https://api.cdp.coinbase.com${cdpPath}`;
+// app.use("/cdp-proxy") makes req.path relative to /cdp-proxy
+app.use("/cdp-proxy", async (req: express.Request, res: express.Response) => {
+  const cdpUrl = `https://api.cdp.coinbase.com${req.path}${req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""}`;
   try {
     const upstream = await fetch(cdpUrl, {
       method:  req.method,
@@ -44,7 +46,6 @@ app.all("/cdp-proxy/*", async (req, res) => {
     res.status(502).json({ error: "CDP proxy error", detail: e.message });
   }
 });
-app.use(express.json({ limit: "1mb" }));
 
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
