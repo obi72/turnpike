@@ -64,6 +64,11 @@ export function useWallet() {
     }
   }
 
+  function cancelOtp() {
+    setOtpSent(false);
+    setFlowId(null);
+  }
+
   return {
     user,
     address:    evmAddress,
@@ -73,6 +78,7 @@ export function useWallet() {
     error,
     login,
     verifyOtp,
+    cancelOtp,
     logout:         signOut,
     getUsdcBalance,
   };

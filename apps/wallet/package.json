@@ -3,23 +3,24 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev":   "next dev -p 3002",
+    "dev": "next dev -p 3002",
     "build": "next build",
     "start": "next start -p 3002",
-    "lint":  "next lint"
+    "lint": "next lint"
   },
   "dependencies": {
-    "@coinbase/cdp-hooks":   "^0.0.109",
-    "@coinbase/cdp-react":   "^0.0.109",
-    "@coinbase/cdp-core":    "^0.0.109",
-    "x402":                  "^1.2.0",
-    "next":                  "^15.0.0",
-    "react":                 "^18.0.0",
-    "react-dom":             "^18.0.0"
+    "@coinbase/cdp-core": "^0.0.109",
+    "@coinbase/cdp-hooks": "^0.0.109",
+    "@coinbase/cdp-react": "^0.0.109",
+    "next": "^15.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "x402": "^1.2.0",
+    "x402-fetch": "^1.2.0"
   },
   "devDependencies": {
-    "@types/node":  "^20.0.0",
+    "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
-    "typescript":   "^5.0.0"
+    "typescript": "^5.0.0"
   }
 }

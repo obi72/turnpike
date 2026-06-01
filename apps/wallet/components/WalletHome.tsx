@@ -6,7 +6,7 @@ import { useWallet } from "@/hooks/useWallet";
 export default function WalletHome() {
   const {
     isLoggedIn, otpSent, loading, error,
-    address, login, verifyOtp, logout, getUsdcBalance,
+    address, login, verifyOtp, cancelOtp, logout, getUsdcBalance,
   } = useWallet();
 
   const [email, setEmail]     = useState("");
@@ -91,7 +91,7 @@ export default function WalletHome() {
             </button>
             <button
               className="ghost"
-              onClick={() => { setOtpSent(false); setOtp(""); }}
+              onClick={() => { cancelOtp(); setOtp(""); }}
               style={{ marginTop: 8, fontSize: 12 }}
             >
               ← Back
