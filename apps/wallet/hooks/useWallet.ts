@@ -13,7 +13,7 @@ import type { User } from "@coinbase/cdp-core";
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 export function useWallet() {
-  const [user, setUser]       = useState<User | null>(() => getCurrentUserSync());
+  const [user, setUser]       = useState<User | null>(null);
   const [flowId, setFlowId]   = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -21,6 +21,8 @@ export function useWallet() {
 
   // Subscribe to auth state changes
   useEffect(() => {
+    // Read initial user state client-side only
+    try { setUser(getCurrentUserSync()); } catch {}
     onAuthStateChange((u) => setUser(u ?? null));
   }, []);
 
