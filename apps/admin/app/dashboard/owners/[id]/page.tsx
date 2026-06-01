@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { getOwner, deleteFile, deleteAllFiles, suspendOwner, unsuspendOwner, updateSlots, type OwnerDetail } from "@/lib/api";
+import { getOwner, deleteFile, deleteAllFiles, suspendOwner, unsuspendOwner, updateSlots, closeOwner, type OwnerDetail } from "@/lib/api";
 
 export default function OwnerDetailPage() {
   const { id }   = useParams<{ id: string }>();
@@ -67,7 +67,7 @@ export default function OwnerDetailPage() {
           Delete all files
         </button>
         <button className="danger" disabled={acting}
-          onClick={() => { if (confirm("Permanently close this account?")) act(() => router.push("/dashboard")); }}>
+          onClick={() => { if (confirm("Permanently close this account?")) act(async () => { await closeOwner(id); router.push("/dashboard"); }); }}>
           Close account
         </button>
       </div>

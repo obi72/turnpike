@@ -1,15 +1,21 @@
 // Admin API client — calls the admin Cloudflare Worker via SUPER_ADMIN_SECRET.
 // This runs server-side in Next.js API routes to keep the secret out of the browser.
 
-const ADMIN_API_URL     = process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "https://admin-api.trnpk.net";
-const SUPER_ADMIN_SECRET = process.env.SUPER_ADMIN_SECRET ?? "";
+const ADMIN_API_URL = process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "https://admin-api.trnpk.net";
+
+function getSecret(): string {
+  if (typeof window !== "undefined") {
+    return sessionStorage.getItem("admin_secret") ?? "";
+  }
+  return "";
+}
 
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res  = await fetch(`${ADMIN_API_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type":  "application/json",
-      Authorization:   `Bearer ${SUPER_ADMIN_SECRET}`,
+      Authorization:   `Bearer ${getSecret()}`,
       ...((init.headers as Record<string, string>) ?? {}),
     },
   });
