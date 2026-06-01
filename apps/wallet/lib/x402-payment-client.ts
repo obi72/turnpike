@@ -1,14 +1,16 @@
 /**
- * x402 payment client using CDP's built-in fetchWithX402.
- * The CDP embedded wallet signs the payment automatically.
+ * x402 payment client using CDP's fetchWithX402.
+ * Signs USDC payments via the CDP embedded wallet automatically.
  */
 
 import { fetchWithX402 } from "@coinbase/cdp-core";
 
-export async function createPaymentClient(_walletAddress: string) {
+export async function createPaymentClient(address: string) {
+  const { fetchWithPayment } = fetchWithX402({ address });
+
   return {
     async pay(payUrl: string): Promise<Response> {
-      return fetchWithX402(payUrl);
+      return fetchWithPayment(payUrl);
     },
   };
 }

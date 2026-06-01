@@ -1,27 +1,32 @@
 "use client";
 
 import {
-  useCurrentUser,
-  useSignInWithEmail,
-  useVerifyEmailOTP,
-  useSignOut,
-  useEvmAddress,
-} from "@coinbase/cdp-hooks";
-import { useState } from "react";
+  signInWithEmail,
+  verifyEmailOTP,
+  signOut,
+  getCurrentUserSync,
+  onAuthStateChange,
+} from "@coinbase/cdp-core";
+import { useState, useEffect } from "react";
+import type { User } from "@coinbase/cdp-core";
 
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 export function useWallet() {
-  const { user }            = useCurrentUser();
-  const { evmAddress }      = useEvmAddress();
-  const { signInWithEmail } = useSignInWithEmail();
-  const { verifyEmailOTP }  = useVerifyEmailOTP();
-  const { signOut }         = useSignOut();
-
+  const [user, setUser]       = useState<User | null>(() => getCurrentUserSync());
   const [flowId, setFlowId]   = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
+
+  // Subscribe to auth state changes
+  useEffect(() => {
+    const unsub = onAuthStateChange((u) => setUser(u ?? null));
+    return () => unsub?.();
+  }, []);
+
+  // Derive wallet address from user's EVM accounts
+  const address = user?.evmAccountObjects?.[0]?.address ?? null;
 
   async function login(email: string) {
     setLoading(true); setError(null);
@@ -50,12 +55,21 @@ export function useWallet() {
     }
   }
 
+  function cancelOtp() {
+    setOtpSent(false);
+    setFlowId(null);
+  }
+
+  async function logout() {
+    await signOut();
+  }
+
   async function getUsdcBalance(): Promise<number> {
-    if (!evmAddress) return 0;
+    if (!address) return 0;
     try {
       const res  = await fetch(
         `https://api.basescan.org/api?module=account&action=tokenbalance` +
-        `&contractaddress=${USDC_ADDRESS}&address=${evmAddress}&tag=latest`,
+        `&contractaddress=${USDC_ADDRESS}&address=${address}&tag=latest`,
       );
       const data = await res.json();
       return parseFloat(data.result ?? "0") / 1e6;
@@ -64,14 +78,9 @@ export function useWallet() {
     }
   }
 
-  function cancelOtp() {
-    setOtpSent(false);
-    setFlowId(null);
-  }
-
   return {
     user,
-    address:    evmAddress,
+    address,
     isLoggedIn: !!user,
     otpSent,
     loading,
@@ -79,7 +88,7 @@ export function useWallet() {
     login,
     verifyOtp,
     cancelOtp,
-    logout:         signOut,
+    logout,
     getUsdcBalance,
   };
 }
