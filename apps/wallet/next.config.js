@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 module.exports = {
+  webpack: (config) => {
+    // Ignore optional pino-pretty dependency from WalletConnect/wagmi
+    config.externals.push("pino-pretty", "lokijs", "encoding");
+    return config;
+  },
   async headers() {
     return [
       {
