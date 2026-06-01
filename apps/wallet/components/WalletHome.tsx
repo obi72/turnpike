@@ -6,20 +6,14 @@ import { useWallet } from "@/hooks/useWallet";
 const CDP_PROJECT_ID = process.env.NEXT_PUBLIC_CDP_PROJECT_ID ?? "";
 
 export default function WalletHome() {
-  const {
-    user, address, isLoggedIn, otpSent,
-    loading, error,
-    login, verifyOtp, logout, getUsdcBalance,
-  } = useWallet();
+  const { address, isLoggedIn, login, logout, getUsdcBalance } = useWallet();
 
-  const [email, setEmail]     = useState("");
-  const [otp, setOtp]         = useState("");
   const [balance, setBalance] = useState<number | null>(null);
   const [topup, setTopup]     = useState(5);
 
   useEffect(() => {
     if (isLoggedIn) getUsdcBalance().then(setBalance);
-  }, [isLoggedIn, getUsdcBalance]);
+  }, [isLoggedIn]);
 
   function openOnramp() {
     if (!address) return;
@@ -39,46 +33,14 @@ export default function WalletHome() {
         <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 4 }}>Turnpike</h1>
         <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 32 }}>
           Pay for digital content in seconds.
-          No app, no seed phrase.
+          No seed phrase needed.
         </p>
-
-        {!otpSent ? (
-          <>
-            <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>Email address</p>
-            <input
-              type="email" value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              onKeyDown={e => e.key === "Enter" && login(email)}
-              style={{ marginBottom: 12 }}
-            />
-            <button onClick={() => login(email)} disabled={loading || !email}>
-              {loading ? "Sending code…" : "Continue with email"}
-            </button>
-            <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 10, textAlign: "center" }}>
-              We&apos;ll send a one-time code. No password needed.
-            </p>
-          </>
-        ) : (
-          <>
-            <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>
-              Code sent to <strong>{email}</strong>
-            </p>
-            <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>6-digit code</p>
-            <input
-              type="text" inputMode="numeric" maxLength={6}
-              value={otp} onChange={e => setOtp(e.target.value)}
-              placeholder="123456"
-              onKeyDown={e => e.key === "Enter" && verifyOtp(otp)}
-              style={{ letterSpacing: "0.3em", fontFamily: "var(--mono)", textAlign: "center", marginBottom: 12 }}
-            />
-            <button onClick={() => verifyOtp(otp)} disabled={loading || otp.length < 6}>
-              {loading ? "Verifying…" : "Confirm code"}
-            </button>
-          </>
-        )}
-
-        {error && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 10 }}>{error}</p>}
+        <button onClick={() => login()}>
+          Connect Wallet
+        </button>
+        <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 10, textAlign: "center" }}>
+          Uses Coinbase Smart Wallet — create one with just your email.
+        </p>
       </div>
     );
   }
@@ -88,7 +50,7 @@ export default function WalletHome() {
     <div style={{ maxWidth: 380, margin: "0 auto", padding: "40px 20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h1 style={{ fontSize: 20, fontWeight: 600 }}>Turnpike</h1>
-        <button className="ghost" onClick={logout} style={{ width: "auto", padding: "6px 12px", fontSize: 12 }}>
+        <button className="ghost" onClick={() => logout()} style={{ width: "auto", padding: "6px 12px", fontSize: 12 }}>
           Sign out
         </button>
       </div>
