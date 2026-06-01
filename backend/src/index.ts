@@ -15,6 +15,7 @@ app.use(helmet());
 app.use(cors({
   origin: [
     "https://trnpk.net",
+    "https://wallet.trnpk.net",
     "https://app.trnpk.net",
     "https://admin.trnpk.net",
     "http://localhost:3001",
@@ -23,6 +24,26 @@ app.use(cors({
   ],
   credentials: true,
 }));
+
+// CDP API proxy — bypasses browser CORS restrictions
+app.all("/cdp-proxy/*", async (req, res) => {
+  const cdpPath = req.path.replace("/cdp-proxy", "");
+  const cdpUrl  = `https://api.cdp.coinbase.com${cdpPath}`;
+  try {
+    const upstream = await fetch(cdpUrl, {
+      method:  req.method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(req.headers["authorization"] ? { Authorization: req.headers["authorization"] as string } : {}),
+      },
+      body: ["GET", "HEAD"].includes(req.method) ? undefined : JSON.stringify(req.body),
+    });
+    const data = await upstream.text();
+    res.status(upstream.status).set("Content-Type", "application/json").send(data);
+  } catch (e: any) {
+    res.status(502).json({ error: "CDP proxy error", detail: e.message });
+  }
+});
 app.use(express.json({ limit: "1mb" }));
 
 app.use(rateLimit({
