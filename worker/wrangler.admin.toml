@@ -1,0 +1,19 @@
+name               = "turnpike-admin"
+main               = "src/admin-worker.js"
+compatibility_date = "2025-01-01"
+
+# Set via CLI — never commit these values:
+#   wrangler secret put SUPER_ADMIN_SECRET --config wrangler.admin.toml
+
+[[kv_namespaces]]
+binding = "ROUTES"
+id      = "6f5c80cbca8142c5bbf179ed5b29dccf"
+
+[[r2_buckets]]
+binding     = "FILES"
+bucket_name = "turnpike-files"
+
+# Route wird nach Domain-Setup manuell eingetragen:
+# [[routes]]
+# pattern   = "admin-api.trnpk.net/*"
+# zone_name = "trnpk.net"

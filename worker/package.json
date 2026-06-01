@@ -1,0 +1,20 @@
+{
+  "name": "turnpike-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev":           "wrangler dev",
+    "dev:admin":     "wrangler dev --config wrangler.admin.toml",
+    "deploy":        "wrangler deploy",
+    "deploy:admin":  "wrangler deploy --config wrangler.admin.toml",
+    "deploy:all":    "wrangler deploy && wrangler deploy --config wrangler.admin.toml",
+    "kv:create":     "wrangler kv namespace create turnpike-routes",
+    "r2:create":     "wrangler r2 bucket create turnpike-files"
+  },
+  "dependencies": {
+    "x402": "^1.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

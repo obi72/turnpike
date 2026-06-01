@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Environment files — NEVER committen!
+.env
+.env.local
+.env.production
+.env*.local
+
+# Build outputs
+.next/
+dist/
+build/
+out/
+
+# Cloudflare
+.wrangler/
+
+# Misc
+.DS_Store
+*.log
+npm-debug.log*
+.vercel
