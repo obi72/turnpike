@@ -32,10 +32,12 @@ app.use(express.json({ limit: "1mb" }));
 app.use("/cdp-proxy", async (req: express.Request, res: express.Response) => {
   const cdpUrl = `https://api.cdp.coinbase.com${req.path}${req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""}`;
   try {
+    const cdpClientKey = process.env.CDP_CLIENT_KEY ?? "";
     const upstream = await fetch(cdpUrl, {
       method:  req.method,
       headers: {
         "Content-Type": "application/json",
+        ...(cdpClientKey ? { Authorization: `Bearer ${cdpClientKey}` } : {}),
         ...(req.headers["authorization"] ? { Authorization: req.headers["authorization"] as string } : {}),
       },
       body: ["GET", "HEAD"].includes(req.method) ? undefined : JSON.stringify(req.body),

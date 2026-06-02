@@ -7,6 +7,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <CDPHooksProvider
       config={{
         projectId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID!,
+        basePath:  `${process.env.NEXT_PUBLIC_API_URL ?? "https://turnpike-production.up.railway.app"}/cdp-proxy`,
         ethereum: {
           createOnLogin: "smart",
         },
