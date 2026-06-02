@@ -12,20 +12,20 @@ const PAY_BASE = "https://pay.trnpk.net";
 type State = "idle" | "paying" | "success" | "error" | "needsLogin" | "needsFunds";
 
 export default function PayPage() {
-  const { slug }  = useParams<{ slug: string }>();
-  const { ready, isLoggedIn, address, getUsdcBalance, login, embeddedWallet } = useWallet();
+  const { slug } = useParams<{ slug: string }>();
+  const { isLoggedIn, address, getUsdcBalance, login } = useWallet();
 
-  const [state, setState]   = useState<State>("idle");
+  const [state, setState]     = useState<State>("idle");
   const [message, setMessage] = useState("");
+  const [email, setEmail]     = useState("");
 
   useEffect(() => {
-    if (!ready) return;
     if (!isLoggedIn) { setState("needsLogin"); return; }
-    if (embeddedWallet) triggerPayment();
-  }, [ready, isLoggedIn, embeddedWallet]);
+    if (address) triggerPayment();
+  }, [isLoggedIn, address]);
 
   async function triggerPayment() {
-    if (!embeddedWallet || !address) return;
+    if (!address) return;
     setState("paying");
 
     const balance = await getUsdcBalance();
@@ -36,7 +36,7 @@ export default function PayPage() {
     }
 
     try {
-      const client   = await createPaymentClient(embeddedWallet);
+      const client   = await createPaymentClient(address);
       const response = await client.pay(`${PAY_BASE}/${slug}`);
 
       if (response.ok) {
@@ -93,7 +93,12 @@ export default function PayPage() {
         <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 20 }}>
           No account needed — just your email address.
         </p>
-        <button onClick={login}>Continue with email</button>
+        <input
+          type="email" value={email} onChange={e => setEmail(e.target.value)}
+          placeholder="you@example.com" style={{ marginBottom: 12 }}
+          onKeyDown={e => e.key === "Enter" && login(email)}
+        />
+        <button onClick={() => login(email)} disabled={!email}>Continue</button>
       </div>
     ),
     needsFunds: (
