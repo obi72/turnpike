@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useWallet } from "@/hooks/useWallet";
 
 export default function WalletHome() {
-  const { ready, isLoggedIn, address, login, logout, getUsdcBalance } = useWallet();
+  const { isLoggedIn, address, login, logout, getUsdcBalance } = useWallet();
   const [balance, setBalance] = useState<number | null>(null);
   const [topup, setTopup]     = useState(5);
 
@@ -28,8 +28,6 @@ export default function WalletHome() {
       "width=480,height=700",
     );
   }
-
-  if (!ready) return null;
 
   // ── Not logged in ──────────────────────────────────────────
   if (!isLoggedIn) {
