@@ -1,38 +1,37 @@
 "use client";
 
 import {
-  signInWithEmail,
-  verifyEmailOTP,
-  signOut,
-  getCurrentUserSync,
-  onAuthStateChange,
-} from "@coinbase/cdp-core";
-import { useState, useEffect, useCallback } from "react";
-import type { User } from "@coinbase/cdp-core";
+  useCurrentUser,
+  useSignInWithEmail,
+  useVerifyEmailOTP,
+  useSignOut,
+} from "@coinbase/cdp-hooks";
+import { useState } from "react";
 
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 export function useWallet() {
-  const [user, setUser]       = useState<User | null>(null);
+  const { currentUser }       = useCurrentUser() as { currentUser: any };
+  const { signInWithEmail }   = useSignInWithEmail() as { signInWithEmail: Function };
+  const { verifyEmailOTP }    = useVerifyEmailOTP() as { verifyEmailOTP: Function };
+  const { signOut }           = useSignOut() as { signOut: Function };
+
   const [flowId, setFlowId]   = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
-  useEffect(() => {
-    // Read initial user only client-side after SDK has initialized
-    try { setUser(getCurrentUserSync()); } catch {}
-    // Subscribe to auth state changes
-    onAuthStateChange((u: User | null | undefined) => setUser(u ?? null));
-  }, []);
-
-  const address = user?.evmAccountObjects?.[0]?.address ?? null;
+  // Derive EVM address from user's accounts
+  const address: string | null =
+    currentUser?.evmAccounts?.[0]?.address ??
+    currentUser?.evmAccountObjects?.[0]?.address ??
+    null;
 
   async function login(email: string) {
     setLoading(true); setError(null);
     try {
-      const { flowId: id } = await signInWithEmail({ email });
-      setFlowId(id);
+      const result = await signInWithEmail({ email });
+      setFlowId(result.flowId);
       setOtpSent(true);
     } catch (e: any) {
       setError(e.message ?? "Failed to send code.");
@@ -61,10 +60,6 @@ export function useWallet() {
     setError(null);
   }
 
-  async function logout() {
-    await signOut();
-  }
-
   async function getUsdcBalance(): Promise<number> {
     if (!address) return 0;
     try {
@@ -80,16 +75,16 @@ export function useWallet() {
   }
 
   return {
-    user,
+    user:       currentUser,
     address,
-    isLoggedIn: !!user,
+    isLoggedIn: !!currentUser,
     otpSent,
     loading,
     error,
     login,
     verifyOtp,
     cancelOtp,
-    logout,
+    logout:     signOut,
     getUsdcBalance,
   };
 }
