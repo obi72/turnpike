@@ -62,6 +62,48 @@ router.post("/login", async (req: Request, res: Response) => {
   return res.json({ token, ownerId, email });
 });
 
+// POST /auth/user-signup  (wallet users — no wallet address required)
+const userSignupSchema = z.object({
+  email:    z.string().email(),
+  password: z.string().min(8),
+});
+
+router.post("/user-signup", async (req: Request, res: Response) => {
+  const parsed = userSignupSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+  const { email, password } = parsed.data;
+
+  const { data, error } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  const ownerId = data.user.id;
+  const token   = jwt.sign({ sub: ownerId, email, role: "user" }, JWT_SECRET, { expiresIn: "30d" });
+  return res.json({ token, userId: ownerId, email });
+});
+
+// POST /auth/user-login
+router.post("/user-login", async (req: Request, res: Response) => {
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+  const { email, password } = parsed.data;
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return res.status(401).json({ error: "Invalid credentials" });
+
+  const ownerId = data.user.id;
+  const token   = jwt.sign({ sub: ownerId, email, role: "user" }, JWT_SECRET, { expiresIn: "30d" });
+  return res.json({ token, userId: ownerId, email });
+});
+
 // POST /auth/refresh
 router.post("/refresh", async (req: Request, res: Response) => {
   const auth = req.headers.authorization?.replace("Bearer ", "");
