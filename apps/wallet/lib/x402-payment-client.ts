@@ -1,16 +1,32 @@
 /**
- * x402 payment client using CDP's fetchWithX402.
- * Signs USDC payments via the CDP embedded wallet automatically.
+ * x402 payment client using wagmi wallet client for signing.
  */
 
-import { fetchWithX402 } from "@coinbase/cdp-core";
+import type { WalletClient } from "viem";
+import { createPaymentHeader, selectPaymentRequirements } from "x402/client";
 
-export async function createPaymentClient(address: string) {
-  const { fetchWithPayment } = fetchWithX402({ address });
-
+export async function createPaymentClient(walletClient: WalletClient) {
   return {
     async pay(payUrl: string): Promise<Response> {
-      return fetchWithPayment(payUrl);
+      const probe = await fetch(payUrl);
+      if (probe.status !== 402) return probe;
+
+      const body        = await probe.json();
+      const x402Version = body.x402Version ?? 1;
+      const requirements = selectPaymentRequirements(body.accepts, {
+        network: "base",
+        scheme:  "exact",
+      });
+
+      const paymentHeader = await createPaymentHeader(
+        walletClient as any,
+        x402Version,
+        requirements,
+      );
+
+      return fetch(payUrl, {
+        headers: { "X-PAYMENT": paymentHeader },
+      });
     },
   };
 }

@@ -1,95 +1,37 @@
 "use client";
 
-import {
-  signInWithEmail,
-  verifyEmailOTP,
-  signOut,
-  getCurrentUserSync,
-  onAuthStateChange,
-} from "@coinbase/cdp-core";
-import { useState, useEffect } from "react";
-import type { User } from "@coinbase/cdp-core";
+import { useAccount, useConnect, useDisconnect, useBalance } from "wagmi";
+import { coinbaseWallet } from "wagmi/connectors";
+import { base } from "wagmi/chains";
 
-const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`;
 
 export function useWallet() {
-  const [user, setUser]       = useState<User | null>(null);
-  const [flowId, setFlowId]   = useState<string | null>(null);
-  const [otpSent, setOtpSent] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const { address, isConnected } = useAccount();
+  const { connect }    = useConnect();
+  const { disconnect } = useDisconnect();
+  const { data: balance } = useBalance({ address, token: USDC_ADDRESS });
 
-  // Subscribe to auth state changes
-  useEffect(() => {
-    // Read initial user state client-side only
-    try { setUser(getCurrentUserSync()); } catch {}
-    onAuthStateChange((u) => setUser(u ?? null));
-  }, []);
-
-  // Derive wallet address from user's EVM accounts
-  const address = user?.evmAccountObjects?.[0]?.address ?? null;
-
-  async function login(email: string) {
-    setLoading(true); setError(null);
-    try {
-      const { flowId } = await signInWithEmail({ email });
-      setFlowId(flowId);
-      setOtpSent(true);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function verifyOtp(otp: string) {
-    if (!flowId) return;
-    setLoading(true); setError(null);
-    try {
-      await verifyEmailOTP({ flowId, otp });
-      setOtpSent(false);
-      setFlowId(null);
-    } catch {
-      setError("Incorrect code — please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function cancelOtp() {
-    setOtpSent(false);
-    setFlowId(null);
-  }
-
-  async function logout() {
-    await signOut();
+  function login() {
+    connect({
+      connector: coinbaseWallet({
+        appName:    "Turnpike",
+        preference: "smartWalletOnly",
+      }),
+      chainId: base.id,
+    });
   }
 
   async function getUsdcBalance(): Promise<number> {
-    if (!address) return 0;
-    try {
-      const res  = await fetch(
-        `https://api.basescan.org/api?module=account&action=tokenbalance` +
-        `&contractaddress=${USDC_ADDRESS}&address=${address}&tag=latest`,
-      );
-      const data = await res.json();
-      return parseFloat(data.result ?? "0") / 1e6;
-    } catch {
-      return 0;
-    }
+    if (!balance) return 0;
+    return parseFloat(balance.formatted);
   }
 
   return {
-    user,
     address,
-    isLoggedIn: !!user,
-    otpSent,
-    loading,
-    error,
+    isLoggedIn: isConnected,
     login,
-    verifyOtp,
-    cancelOtp,
-    logout,
+    logout:         () => disconnect(),
     getUsdcBalance,
   };
 }

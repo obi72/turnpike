@@ -1,20 +1,16 @@
 /** @type {import('next').NextConfig} */
 module.exports = {
-  transpilePackages: [
-    "@coinbase/cdp-core",
-    "@coinbase/cdp-hooks",
-    "@coinbase/cdp-react",
-    "x402",
-  ],
+  webpack: (config) => {
+    config.externals.push("pino-pretty", "lokijs", "encoding");
+    return config;
+  },
   async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          { key: "X-Frame-Options",       value: "DENY" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-        ],
-      },
-    ];
+    return [{
+      source: "/(.*)",
+      headers: [
+        { key: "X-Frame-Options",       value: "DENY" },
+        { key: "X-Content-Type-Options", value: "nosniff" },
+      ],
+    }];
   },
 };
