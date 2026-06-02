@@ -1,9 +1,12 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { useState, useEffect } from "react";
 import { CDPHooksProvider } from "@coinbase/cdp-hooks";
 
-function CDPProviderInner({ children }: { children: React.ReactNode }) {
+export function Providers({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
   return (
     <CDPHooksProvider
       config={{
@@ -17,12 +20,4 @@ function CDPProviderInner({ children }: { children: React.ReactNode }) {
       {children}
     </CDPHooksProvider>
   );
-}
-
-const CDPProviderNoSSR = dynamic(() => Promise.resolve(CDPProviderInner), {
-  ssr: false,
-});
-
-export function Providers({ children }: { children: React.ReactNode }) {
-  return <CDPProviderNoSSR>{children}</CDPProviderNoSSR>;
 }
