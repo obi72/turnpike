@@ -387,7 +387,7 @@ async function createSplitterWallet({ providerWallet, priceUnits, platformFee, e
     const providerPct = Math.round(((priceUnits - platformFee) / priceUnits) * 100);
     const platformPct = 100 - providerPct;
 
-    const jwt = await buildCdpJwt(env.CDP_API_KEY, env.CDP_API_KEY_PRIVATE);
+    const jwt = await buildCdpJwt(env.CDP_API_KEY, env.CDP_API_KEY_PRIVATE, "POST", "/platform/v1/wallets");
 
     const walletRes = await fetch(`${CDP_BASE}/wallets`, {
       method: "POST",
@@ -427,17 +427,24 @@ async function createSplitterWallet({ providerWallet, priceUnits, platformFee, e
   }
 }
 
-// Baut ein kurzlebiges JWT für die CDP API v1 (ES256 / P-256).
-async function buildCdpJwt(keyId, privateKeyB64) {
+// Baut ein kurzlebiges request-spezifisches JWT für die CDP API (ES256 / P-256).
+// Das "uris"-Claim ist erforderlich: "METHOD host/path"
+async function buildCdpJwt(keyId, privateKeyB64, method = "POST", path = "/platform/v1/wallets") {
   const raw    = Uint8Array.from(atob(privateKeyB64), c => c.charCodeAt(0));
   const key    = await crypto.subtle.importKey(
-    "raw", raw.slice(0, 32),
+    "pkcs8", raw,
     { name: "ECDSA", namedCurve: "P-256" },
     false, ["sign"],
   );
   const now    = Math.floor(Date.now() / 1000);
   const header  = { alg: "ES256", kid: keyId, typ: "JWT" };
-  const payload = { sub: keyId, iss: "cdp", nbf: now, exp: now + 120 };
+  const payload = {
+    sub:  keyId,
+    iss:  "cdp",
+    nbf:  now,
+    exp:  now + 120,
+    uris: `${method} api.cdp.coinbase.com${path}`,
+  };
   const enc     = (obj) => btoa(JSON.stringify(obj)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   const data    = `${enc(header)}.${enc(payload)}`;
   const sig     = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(data));
