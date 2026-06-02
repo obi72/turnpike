@@ -3,26 +3,24 @@
 import { useState, useEffect } from "react";
 import { useWallet } from "@/hooks/useWallet";
 
-const CDP_PROJECT_ID = process.env.NEXT_PUBLIC_CDP_PROJECT_ID ?? "";
-
 export default function WalletHome() {
-  const { address, isLoggedIn, login, logout, getUsdcBalance } = useWallet();
+  const { ready, isLoggedIn, address, login, logout, getUsdcBalance } = useWallet();
   const [balance, setBalance] = useState<number | null>(null);
   const [topup, setTopup]     = useState(5);
 
   useEffect(() => {
     if (isLoggedIn) getUsdcBalance().then(setBalance);
-  }, [isLoggedIn]);
+  }, [isLoggedIn, address]);
 
-  function openOnramp() {
+  function openStripeOnramp() {
     if (!address) return;
     const params = new URLSearchParams({
-      "transaction_details[wallet_addresses][ethereum]":          address,
-      "transaction_details[lock_wallet_address]":                 "true",
-      "transaction_details[supported_destination_networks][]":    "base",
-      "transaction_details[supported_destination_currencies][]":  "usdc",
-      "transaction_details[destination_currency]":                "usdc",
-      "transaction_details[destination_network]":                 "base",
+      "transaction_details[wallet_addresses][ethereum]":         address,
+      "transaction_details[lock_wallet_address]":                "true",
+      "transaction_details[supported_destination_networks][]":   "base",
+      "transaction_details[supported_destination_currencies][]": "usdc",
+      "transaction_details[destination_currency]":               "usdc",
+      "transaction_details[destination_network]":                "base",
     });
     window.open(
       `https://crypto.link.com?${params.toString()}`,
@@ -31,23 +29,27 @@ export default function WalletHome() {
     );
   }
 
+  if (!ready) return null;
+
+  // ── Not logged in ──────────────────────────────────────────
   if (!isLoggedIn) {
     return (
       <div style={{ maxWidth: 360, margin: "0 auto", padding: "60px 20px" }}>
         <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 4 }}>Turnpike</h1>
         <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 32 }}>
-          Pay for digital content in seconds — no app required.
+          Pay for digital content instantly — no app required.
         </p>
         <button onClick={login} style={{ width: "100%" }}>
-          Sign in
+          Continue with email
         </button>
         <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 10, textAlign: "center" }}>
-          Sign in with email — no password or app needed.
+          Enter your email and we send a code. No password needed.
         </p>
       </div>
     );
   }
 
+  // ── Logged in ──────────────────────────────────────────────
   return (
     <div style={{ maxWidth: 380, margin: "0 auto", padding: "40px 20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
@@ -57,6 +59,7 @@ export default function WalletHome() {
         </button>
       </div>
 
+      {/* Balance */}
       <div style={{
         background: "var(--bg-2)", borderRadius: "var(--radius)",
         padding: 24, textAlign: "center", marginBottom: 16,
@@ -70,7 +73,8 @@ export default function WalletHome() {
         </p>
       </div>
 
-      <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 8 }}>Add funds</p>
+      {/* Add funds */}
+      <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 8 }}>Add funds with card</p>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         {[5, 10, 20, 50].map(amt => (
           <button key={amt} onClick={() => setTopup(amt)} style={{
@@ -81,11 +85,16 @@ export default function WalletHome() {
           }}>${amt}</button>
         ))}
       </div>
-      <button onClick={openOnramp} style={{ marginBottom: 28 }}>Add ${topup}</button>
+      <button onClick={openStripeOnramp} style={{ marginBottom: 28 }}>Add ${topup}</button>
 
+      {/* How it works */}
       <div style={{ background: "var(--bg-2)", borderRadius: "var(--radius)", padding: 16 }}>
         <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 10 }}>How payments work</p>
-        {["Visit any Turnpike pay link", "Payment is processed automatically", "Content unlocks in under 5 seconds"].map((t, i) => (
+        {[
+          "Visit any Turnpike pay link",
+          "Payment is processed automatically",
+          "Content unlocks in under 5 seconds",
+        ].map((t, i) => (
           <div key={i} style={{ display: "flex", gap: 10, marginBottom: 6, fontSize: 12, color: "var(--text-2)" }}>
             <span style={{ color: "var(--accent)", fontWeight: 500 }}>{i + 1}.</span>
             <span>{t}</span>

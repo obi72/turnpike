@@ -1,9 +1,12 @@
 /** @type {import('next').NextConfig} */
 module.exports = {
-  webpack: (config) => {
-    config.externals.push("pino-pretty", "lokijs", "encoding", "@react-native-async-storage/async-storage");
-    return config;
-  },
+  transpilePackages: [
+    "@coinbase/cdp-core",
+    "@coinbase/cdp-hooks",
+    "@coinbase/cdp-react",
+    "x402",
+    "x402-fetch",
+  ],
   async headers() {
     return [{
       source: "/(.*)",

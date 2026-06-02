@@ -5,7 +5,6 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useWallet } from "@/hooks/useWallet";
-import { useWalletClient } from "wagmi";
 import { createPaymentClient } from "@/lib/x402-payment-client";
 
 const PAY_BASE = "https://pay.trnpk.net";
@@ -13,20 +12,20 @@ const PAY_BASE = "https://pay.trnpk.net";
 type State = "idle" | "paying" | "success" | "error" | "needsLogin" | "needsFunds";
 
 export default function PayPage() {
-  const { slug }                  = useParams<{ slug: string }>();
-  const { isLoggedIn, address, getUsdcBalance, login } = useWallet();
-  const { data: walletClient }    = useWalletClient();
+  const { slug }  = useParams<{ slug: string }>();
+  const { ready, isLoggedIn, address, getUsdcBalance, login, embeddedWallet } = useWallet();
 
-  const [state, setState]         = useState<State>("idle");
-  const [message, setMessage]     = useState("");
+  const [state, setState]   = useState<State>("idle");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
+    if (!ready) return;
     if (!isLoggedIn) { setState("needsLogin"); return; }
-    if (walletClient) triggerPayment();
-  }, [isLoggedIn, walletClient]);
+    if (embeddedWallet) triggerPayment();
+  }, [ready, isLoggedIn, embeddedWallet]);
 
   async function triggerPayment() {
-    if (!walletClient || !address) return;
+    if (!embeddedWallet || !address) return;
     setState("paying");
 
     const balance = await getUsdcBalance();
@@ -37,7 +36,7 @@ export default function PayPage() {
     }
 
     try {
-      const client   = await createPaymentClient(walletClient);
+      const client   = await createPaymentClient(embeddedWallet);
       const response = await client.pay(`${PAY_BASE}/${slug}`);
 
       if (response.ok) {
@@ -90,11 +89,11 @@ export default function PayPage() {
     ),
     needsLogin: (
       <div style={{ textAlign: "center" }}>
-        <p style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>Sign in to pay</p>
+        <p style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>Enter your email to pay</p>
         <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 20 }}>
-          You need a Turnpike account to access this content.
+          No account needed — just your email address.
         </p>
-        <button onClick={login}>Sign in</button>
+        <button onClick={login}>Continue with email</button>
       </div>
     ),
     needsFunds: (
