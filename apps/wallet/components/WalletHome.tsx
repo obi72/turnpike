@@ -18,19 +18,18 @@ export default function WalletHome() {
     if (isLoggedIn) getUsdcBalance().then(setBalance);
   }, [isLoggedIn, address]);
 
-  function openStripeOnramp() {
+  function openCoinbaseOnramp() {
     if (!address) return;
+    const appId = process.env.NEXT_PUBLIC_CDP_PROJECT_ID;
     const params = new URLSearchParams({
-      "transaction_details[wallet_addresses][ethereum]":         address,
-      "transaction_details[lock_wallet_address]":                "true",
-      "transaction_details[supported_destination_networks][]":   "base",
-      "transaction_details[supported_destination_currencies][]": "usdc",
-      "transaction_details[destination_currency]":               "usdc",
-      "transaction_details[destination_network]":                "base",
+      appId:     appId ?? "",
+      addresses: JSON.stringify({ [address]: ["base"] }),
+      assets:    JSON.stringify(["USDC"]),
+      defaultNetwork: "base",
     });
     window.open(
-      `https://crypto.link.com?${params.toString()}`,
-      "stripe-onramp",
+      `https://pay.coinbase.com/buy/select-asset?${params.toString()}`,
+      "coinbase-onramp",
       "width=480,height=700",
     );
   }
@@ -136,7 +135,7 @@ export default function WalletHome() {
           }}>${amt}</button>
         ))}
       </div>
-      <button onClick={openStripeOnramp} style={{ marginBottom: 28 }}>Add ${topup}</button>
+      <button onClick={openCoinbaseOnramp} style={{ marginBottom: 28 }}>Add ${topup}</button>
 
       <div style={{ background: "var(--bg-2)", borderRadius: "var(--radius)", padding: 16 }}>
         <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 10 }}>How payments work</p>
