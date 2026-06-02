@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+// @ts-ignore
+import { generateJwt } from "@coinbase/cdp-sdk/auth";
 
 import authRouter       from "./routes/auth";
 import publishersRouter from "./routes/publishers";
@@ -30,15 +32,23 @@ app.use(express.json({ limit: "1mb" }));
 // CDP API proxy — bypasses browser CORS restrictions
 // app.use("/cdp-proxy") makes req.path relative to /cdp-proxy
 app.use("/cdp-proxy", async (req: express.Request, res: express.Response) => {
-  const cdpUrl = `https://api.cdp.coinbase.com${req.path}${req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""}`;
+  const requestPath = req.path;
+  const cdpUrl      = `https://api.cdp.coinbase.com${requestPath}${req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""}`;
   try {
-    const cdpClientKey = process.env.CDP_CLIENT_KEY ?? "";
+    // Generate a fresh JWT for each CDP API request
+    const jwt = await generateJwt({
+      apiKeyId:      process.env.CDP_API_KEY_ID     ?? "",
+      apiKeySecret:  process.env.CDP_API_KEY_SECRET  ?? "",
+      requestMethod: req.method,
+      requestHost:   "api.cdp.coinbase.com",
+      requestPath,
+    });
+
     const upstream = await fetch(cdpUrl, {
       method:  req.method,
       headers: {
-        "Content-Type": "application/json",
-        ...(cdpClientKey ? { Authorization: `Bearer ${cdpClientKey}` } : {}),
-        ...(req.headers["authorization"] ? { Authorization: req.headers["authorization"] as string } : {}),
+        "Content-Type":  "application/json",
+        Authorization:   `Bearer ${jwt}`,
       },
       body: ["GET", "HEAD"].includes(req.method) ? undefined : JSON.stringify(req.body),
     });

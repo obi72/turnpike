@@ -8,6 +8,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@coinbase/cdp-sdk": "^1.51.0",
     "@supabase/supabase-js": "^2.0.0",
     "@types/ws": "^8.18.1",
     "cors": "^2.8.5",
