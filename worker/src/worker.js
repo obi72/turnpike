@@ -103,6 +103,53 @@ async function handlePaywall(request, env) {
 
   // ── Kein Payment-Header: 402 zurückgeben ──────────────────
   if (!paymentHeader) {
+    // Browser-Request? → schöne HTML-Seite anzeigen
+    const accept = request.headers.get("Accept") ?? "";
+    if (accept.includes("text/html")) {
+      const price   = (parseInt(route.price) / 1_000_000).toFixed(2);
+      const walletUrl = `https://wallet.trnpk.net/pay/${slug}`;
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${route.description ?? slug} — Turnpike</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: #fff; border-radius: 16px; padding: 48px 40px; max-width: 420px; width: 100%; box-shadow: 0 4px 24px rgba(0,0,0,0.08); text-align: center; }
+    .icon { font-size: 40px; margin-bottom: 20px; }
+    h1 { font-size: 20px; font-weight: 600; color: #111; margin-bottom: 8px; }
+    .desc { font-size: 14px; color: #666; margin-bottom: 32px; line-height: 1.5; }
+    .price-box { background: #f0f7ff; border-radius: 12px; padding: 20px; margin-bottom: 28px; }
+    .price { font-size: 36px; font-weight: 700; color: #0052ff; }
+    .price-label { font-size: 13px; color: #666; margin-top: 4px; }
+    .btn { display: block; background: #0052ff; color: #fff; text-decoration: none; padding: 16px 24px; border-radius: 10px; font-size: 16px; font-weight: 600; transition: background 0.15s; }
+    .btn:hover { background: #0040cc; }
+    .footer { margin-top: 20px; font-size: 12px; color: #999; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🔒</div>
+    <h1>${route.description ?? slug}</h1>
+    <p class="desc">This content requires a one-time payment to access.</p>
+    <div class="price-box">
+      <div class="price">$${price}</div>
+      <div class="price-label">one-time · USDC on Base</div>
+    </div>
+    <a class="btn" href="${walletUrl}">Pay with Turnpike</a>
+    <p class="footer">Powered by <a href="https://trnpk.net" style="color:#0052ff;text-decoration:none;">Turnpike</a> · instant micropayments</p>
+  </div>
+</body>
+</html>`;
+      return new Response(html, {
+        status: 402,
+        headers: { "Content-Type": "text/html;charset=UTF-8" },
+      });
+    }
+
+    // API/x402-Client → JSON 402
     return new Response(
       JSON.stringify({
         x402Version: 1,
