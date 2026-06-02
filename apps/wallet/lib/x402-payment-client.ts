@@ -13,10 +13,7 @@ export async function createPaymentClient(walletClient: WalletClient) {
 
       const body        = await probe.json();
       const x402Version = body.x402Version ?? 1;
-      const requirements = selectPaymentRequirements(body.accepts, {
-        network: "base",
-        scheme:  "exact",
-      });
+      const requirements = selectPaymentRequirements(body.accepts, "base", "exact");
 
       const paymentHeader = await createPaymentHeader(
         walletClient as any,
