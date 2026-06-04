@@ -1,0 +1,73 @@
+"use client";
+
+import { useState, useEffect } from "react";
+
+const USDC_ON_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+interface Props {
+  userId: string;
+  walletAddress: string | null;
+}
+
+export default function WalletCard({ walletAddress }: Props) {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (walletAddress) loadBalance();
+  }, [walletAddress]);
+
+  async function loadBalance() {
+    if (!walletAddress) return;
+    setLoading(true);
+    try {
+      const res  = await fetch(
+        `https://api.basescan.org/api?module=account&action=tokenbalance` +
+        `&contractaddress=${USDC_ON_BASE}&address=${walletAddress}&tag=latest`
+      );
+      const data = await res.json();
+      setBalance(Number(data.result) / 1e6);
+    } catch {
+      setBalance(0);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function openOnramp() {
+    if (!walletAddress) return;
+    const params = new URLSearchParams({
+      appId:    process.env.NEXT_PUBLIC_CDP_PROJECT_ID ?? "",
+      assets:   '["USDC"]',
+      addresses: JSON.stringify({ [walletAddress]: ["base"] }),
+    });
+    window.open(`https://pay.coinbase.com/buy/select-asset?${params}`, "_blank", "width=480,height=640");
+  }
+
+  return (
+    <div style={{
+      background: "var(--bg-2)", border: "1px solid var(--border)",
+      borderRadius: "var(--radius)", padding: 20, marginBottom: 16, textAlign: "center",
+    }}>
+      <p style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        Balance
+      </p>
+      <p style={{ fontSize: 42, fontWeight: 600, marginBottom: 4 }}>
+        {loading ? "…" : balance !== null ? `$${balance.toFixed(2)}` : "—"}
+      </p>
+      {walletAddress && (
+        <p style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 16 }}>
+          {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
+        </p>
+      )}
+      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+        <button className="btn-primary" style={{ fontSize: 13 }} onClick={openOnramp}>
+          + Add funds
+        </button>
+        <button className="btn-ghost" style={{ fontSize: 13 }} onClick={loadBalance} disabled={loading}>
+          Refresh
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,26 @@
+name               = "turnpike"
+main               = "src/worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+FACILITATOR_URL = "https://facilitator.cdp.coinbase.com"
+PLATFORM_WALLET = "0xE3221578f28C02c71D4F372ed1EAB7c1A33fB87e"
+
+# Secrets (set via CLI — never commit):
+#   wrangler secret put CDP_API_KEY
+#   wrangler secret put ADMIN_SECRET
+
+[[kv_namespaces]]
+binding = "ROUTES"
+id      = "6f5c80cbca8142c5bbf179ed5b29dccf"
+
+[[r2_buckets]]
+binding     = "FILES"
+bucket_name = "turnpike-files"
+
+[triggers]
+crons = ["0 3 * * *"]
+
+[[routes]]
+pattern   = "pay.trnpk.net/*"
+zone_name = "trnpk.net"

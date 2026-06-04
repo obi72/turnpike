@@ -21,3 +21,4 @@ out/
 *.log
 npm-debug.log*
 .vercel
+HANDOVER.md

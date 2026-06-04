@@ -1,0 +1,13 @@
+{
+  "name": "turnpike",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:user": "npm run dev --workspace=apps/user-app",
+    "dev:admin": "npm run dev --workspace=apps/admin-app",
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "dev:worker": "npm run dev --workspace=apps/worker"
+  }
+}

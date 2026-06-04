@@ -1,0 +1,22 @@
+name               = "turnpike-admin"
+main               = "src/admin-worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+SUPABASE_URL = "https://lbfplsjvcsmcctthyrkn.supabase.co"
+
+# Secrets:
+#   wrangler secret put SUPER_ADMIN_SECRET --config wrangler-admin.toml
+#   wrangler secret put SUPABASE_SERVICE_KEY --config wrangler-admin.toml
+
+[[kv_namespaces]]
+binding = "ROUTES"
+id      = "6f5c80cbca8142c5bbf179ed5b29dccf"
+
+[[r2_buckets]]
+binding     = "FILES"
+bucket_name = "turnpike-files"
+
+[[routes]]
+pattern   = "admin-worker.trnpk.net/*"
+zone_name = "trnpk.net"
