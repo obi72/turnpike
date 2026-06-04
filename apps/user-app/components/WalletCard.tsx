@@ -72,6 +72,17 @@ export default function WalletCard({ userId, walletAddress }: Props) {
       </p>
       <p style={{ fontSize: 42, fontWeight: 600, marginBottom: 4 }}>
         {loading ? "…" : balance !== null ? `$${balance.toFixed(2)}` : "—"}
+        <button
+          onClick={loadBalance} disabled={loading}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            fontSize: 14, color: "var(--text-3)", marginLeft: 8,
+            verticalAlign: "middle", padding: 0, lineHeight: 1,
+          }}
+          title="Refresh balance"
+        >
+          ↻
+        </button>
       </p>
       {walletAddress && (
         <p style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 16 }}>
@@ -89,9 +100,6 @@ export default function WalletCard({ userId, walletAddress }: Props) {
           title={(balance ?? 0) < 10 ? "Minimum withdrawal is $10.00" : "Withdraw to bank"}
         >
           {offrampLoading ? "…" : "Withdraw"}
-        </button>
-        <button className="btn-ghost" style={{ fontSize: 13 }} onClick={loadBalance} disabled={loading}>
-          Refresh
         </button>
       </div>
       {offrampError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{offrampError}</p>}
