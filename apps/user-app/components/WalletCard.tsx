@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 
 const USDC_ON_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
@@ -9,9 +10,11 @@ interface Props {
   walletAddress: string | null;
 }
 
-export default function WalletCard({ walletAddress }: Props) {
+export default function WalletCard({ userId, walletAddress }: Props) {
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [offrampLoading, setOfframpLoading] = useState(false);
+  const [offrampError, setOfframpError] = useState<string | null>(null);
 
   useEffect(() => {
     if (walletAddress) loadBalance();
@@ -31,6 +34,21 @@ export default function WalletCard({ walletAddress }: Props) {
       setBalance(0);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function openOfframp() {
+    if (!walletAddress || balance === null) return;
+    if (balance < 10) { setOfframpError("Minimum withdrawal is $10.00"); return; }
+    setOfframpLoading(true);
+    setOfframpError(null);
+    try {
+      const { url } = await api.transakOfframpSession(walletAddress, balance);
+      window.open(url, "_blank", "width=480,height=700");
+    } catch (err: any) {
+      setOfframpError(err.message);
+    } finally {
+      setOfframpLoading(false);
     }
   }
 
@@ -64,10 +82,19 @@ export default function WalletCard({ walletAddress }: Props) {
         <button className="btn-primary" style={{ fontSize: 13 }} onClick={openOnramp}>
           + Add funds
         </button>
+        <button
+          className="btn-ghost" style={{ fontSize: 13 }}
+          onClick={openOfframp}
+          disabled={offrampLoading || !walletAddress || (balance ?? 0) < 10}
+          title={(balance ?? 0) < 10 ? "Minimum withdrawal is $10.00" : "Withdraw to bank"}
+        >
+          {offrampLoading ? "…" : "Withdraw"}
+        </button>
         <button className="btn-ghost" style={{ fontSize: 13 }} onClick={loadBalance} disabled={loading}>
           Refresh
         </button>
       </div>
+      {offrampError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{offrampError}</p>}
     </div>
   );
 }
