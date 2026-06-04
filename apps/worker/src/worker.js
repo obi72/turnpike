@@ -283,19 +283,27 @@ async function createSplitterWallet({ providerWallet, priceUnits, platformFee, e
   const providerPct = Math.round(((priceUnits - platformFee) / priceUnits) * 100);
   const platformPct = 100 - providerPct;
 
-  const walletRes = await cdpFetch(`${CDP_BASE}/wallets`, "POST", { network_id: "base-mainnet" }, env);
-  const wallet    = await walletRes.json();
-  const splitterAddress = wallet.default_address.address_id;
+  try {
+    const walletRes = await cdpFetch(`${CDP_BASE}/wallets`, "POST", { network_id: "base-mainnet" }, env);
+    if (!walletRes.ok) throw new Error(`CDP ${walletRes.status}`);
+    const wallet = await walletRes.json();
+    if (!wallet?.default_address?.address_id) throw new Error("CDP response missing address");
+    const splitterAddress = wallet.default_address.address_id;
 
-  await cdpFetch(`${CDP_BASE}/wallets/${wallet.id}/webhook_rules`, "POST", {
-    event_type: "erc20_transfer", asset: "usdc", trigger: "on_receive",
-    actions: [
-      { type: "transfer", to: providerWallet,      percentage: providerPct, asset: "usdc", network_id: "base-mainnet" },
-      { type: "transfer", to: env.PLATFORM_WALLET, percentage: platformPct, asset: "usdc", network_id: "base-mainnet" },
-    ],
-  }, env);
+    await cdpFetch(`${CDP_BASE}/wallets/${wallet.id}/webhook_rules`, "POST", {
+      event_type: "erc20_transfer", asset: "usdc", trigger: "on_receive",
+      actions: [
+        { type: "transfer", to: providerWallet,      percentage: providerPct, asset: "usdc", network_id: "base-mainnet" },
+        { type: "transfer", to: env.PLATFORM_WALLET, percentage: platformPct, asset: "usdc", network_id: "base-mainnet" },
+      ],
+    }, env);
 
-  return splitterAddress;
+    return splitterAddress;
+  } catch (err) {
+    // CDP not configured yet — payments go directly to provider (no platform split)
+    console.error("Splitter wallet creation failed, using provider wallet directly:", err.message);
+    return providerWallet;
+  }
 }
 
 // ── Daily cleanup ──────────────────────────────────────────────
