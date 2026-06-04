@@ -7,22 +7,22 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  let { data: profile } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", user!.id)
-    .single();
+  // Always sync — creates row if missing (trigger unreliable for OAuth logins)
+  let profile: any = null;
+  try {
+    const res = await fetch(`${BACKEND}/api/users/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user!.id, email: user!.email }),
+      cache: "no-store",
+    });
+    if (res.ok) profile = await res.json();
+  } catch {}
 
+  // Fallback: read directly from Supabase if backend unreachable
   if (!profile) {
-    try {
-      const res = await fetch(`${BACKEND}/api/users/sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user!.id, email: user!.email }),
-        cache: "no-store",
-      });
-      if (res.ok) profile = await res.json();
-    } catch {}
+    const { data } = await supabase.from("users").select("*").eq("id", user!.id).single();
+    profile = data;
   }
 
   if (profile && !profile.wallet_address) {
