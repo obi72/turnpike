@@ -13,6 +13,18 @@ export default async function DashboardPage() {
     .eq("id", user!.id)
     .single();
 
+  if (!profile) {
+    try {
+      const res = await fetch(`${BACKEND}/api/users/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user!.id, email: user!.email }),
+        cache: "no-store",
+      });
+      if (res.ok) profile = await res.json();
+    } catch {}
+  }
+
   if (profile && !profile.wallet_address) {
     try {
       const res = await fetch(`${BACKEND}/api/users/${user!.id}/create-wallet`, {
