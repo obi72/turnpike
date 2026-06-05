@@ -40,9 +40,7 @@ router.post("/paylinks", async (req, res) => {
   const priceUnits = parseInt(price);
   if (priceUnits < 50000) return res.status(400).json({ error: "Minimum price is $0.05" });
 
-  // Generate a slug from description or random
-  const base = (description ?? "link").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
-  const slug = `${base}-${Date.now().toString(36)}`;
+  const slug = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
 
   try {
     const result = await createPayLink({ slug, secretUrl, price, description, ownerId, providerWallet });

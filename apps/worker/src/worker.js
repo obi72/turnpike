@@ -187,7 +187,7 @@ async function handleUpload(request, env) {
     customMetadata: { ownerId, originalName: file.name, price, fileSize: file.size.toString() },
   });
 
-  const slug = await uniqueSlug(slugify(file.name), env);
+  const slug = await uniqueSlug(Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10), env);
   const splitterAddress = await createSplitterWallet({ providerWallet, priceUnits: parseInt(price), platformFee: fee.platformFee, env });
 
   const route = {
