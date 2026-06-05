@@ -414,9 +414,10 @@ async function makeCdpJwt(method, url, env) {
   );
   const now = Math.floor(Date.now() / 1000);
   const { host, pathname } = new URL(url);
-  const header  = b64url(JSON.stringify({ alg: "ES256", kid: env.CDP_KEY_ID, typ: "JWT" }));
+  const keyName = `organizations/${env.CDP_PROJECT_ID}/apiKeys/${env.CDP_KEY_ID}`;
+  const header  = b64url(JSON.stringify({ alg: "ES256", kid: keyName, typ: "JWT" }));
   const payload = b64url(JSON.stringify({
-    sub: env.CDP_KEY_ID, iss: "cdp",
+    sub: keyName, iss: "coinbase-cloud",
     nbf: now, exp: now + 120, iat: now,
     uriref: `${method} ${host}${pathname}`,
   }));

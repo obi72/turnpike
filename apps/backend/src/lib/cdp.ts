@@ -8,8 +8,8 @@ function b64url(input: string | ArrayBuffer): string {
 }
 
 async function makeCdpJwt(method: string, url: string): Promise<string> {
-  const keyId  = process.env.CDP_KEY_ID!;
   const keyB64 = process.env.CDP_API_KEY!;
+  const keyName = `organizations/${process.env.CDP_PROJECT_ID}/apiKeys/${process.env.CDP_KEY_ID}`;
 
   const keyData  = Buffer.from(keyB64, "base64");
   const privateKey = await (globalThis as any).crypto.subtle.importKey(
@@ -21,9 +21,9 @@ async function makeCdpJwt(method: string, url: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const { host, pathname } = new URL(url);
 
-  const header  = b64url(JSON.stringify({ alg: "ES256", kid: keyId, typ: "JWT" }));
+  const header  = b64url(JSON.stringify({ alg: "ES256", kid: keyName, typ: "JWT" }));
   const payload = b64url(JSON.stringify({
-    sub: keyId, iss: "cdp",
+    sub: keyName, iss: "coinbase-cloud",
     nbf: now, exp: now + 120, iat: now,
     uriref: `${method} ${host}${pathname}`,
   }));

@@ -6,6 +6,7 @@ compatibility_date = "2025-01-01"
 FACILITATOR_URL = "https://facilitator.cdp.coinbase.com"
 PLATFORM_WALLET = "0xE3221578f28C02c71D4F372ed1EAB7c1A33fB87e"
 CDP_KEY_ID      = "20f9c4e8-c483-4588-ae83-87dd78dd1844"
+CDP_PROJECT_ID  = "1e8cd2d4-79c1-4466-9e26-ea639f601922"
 
 # Secrets (set via CLI — never commit):
 #   wrangler secret put CDP_API_KEY
