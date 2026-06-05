@@ -395,10 +395,45 @@ function checkAuth(request, env) {
   return request.headers.get("Authorization") === `Bearer ${env.ADMIN_SECRET}`;
 }
 
+function b64url(input) {
+  let b64;
+  if (input instanceof ArrayBuffer) {
+    b64 = btoa(String.fromCharCode(...new Uint8Array(input)));
+  } else {
+    b64 = btoa(input);
+  }
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+async function makeCdpJwt(method, url, env) {
+  const keyData = Uint8Array.from(atob(env.CDP_API_KEY), c => c.charCodeAt(0));
+  const privateKey = await crypto.subtle.importKey(
+    "pkcs8", keyData.buffer,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false, ["sign"]
+  );
+  const now = Math.floor(Date.now() / 1000);
+  const { host, pathname } = new URL(url);
+  const header  = b64url(JSON.stringify({ alg: "ES256", kid: env.CDP_KEY_ID, typ: "JWT" }));
+  const payload = b64url(JSON.stringify({
+    sub: env.CDP_KEY_ID, iss: "cdp",
+    nbf: now, exp: now + 120, iat: now,
+    uriref: `${method} ${host}${pathname}`,
+  }));
+  const sigInput = `${header}.${payload}`;
+  const sig = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    privateKey,
+    new TextEncoder().encode(sigInput)
+  );
+  return `${sigInput}.${b64url(sig)}`;
+}
+
 async function cdpFetch(url, method, body, env) {
+  const jwt = await makeCdpJwt(method, url, env);
   return fetch(url, {
     method,
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${env.CDP_API_KEY}` },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
     body: body ? JSON.stringify(body) : undefined,
   });
 }
