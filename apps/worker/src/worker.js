@@ -123,10 +123,12 @@ async function handlePaywall(request, env) {
 async function handleCreateRoute(request, env) {
   if (!checkAuth(request, env)) return new Response("Unauthorized", { status: 401 });
 
-  const { slug, secretUrl, price, description, ownerId, providerWallet, splitterAddress } = await request.json();
+  const body = await request.json();
+  const { slug, secretUrl, price, description, ownerId, providerWallet } = body;
+  const splitterAddress = body.splitterAddress ?? providerWallet;
 
-  if (!slug || !secretUrl || !price || !providerWallet || !ownerId || !splitterAddress) {
-    return Response.json({ error: "slug, secretUrl, price, ownerId, providerWallet, splitterAddress required" }, { status: 400 });
+  if (!slug || !secretUrl || !price || !providerWallet || !ownerId) {
+    return Response.json({ error: "slug, secretUrl, price, ownerId, providerWallet required" }, { status: 400 });
   }
 
   const existing = await env.ROUTES.get(slug);
