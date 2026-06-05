@@ -21,11 +21,12 @@ async function makeCdpJwt(method: string, url: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const { host, pathname } = new URL(url);
 
-  const header  = b64url(JSON.stringify({ alg: "ES256", kid: keyName, typ: "JWT" }));
+  const nonce   = require("crypto").randomBytes(16).toString("hex");
+  const header  = b64url(JSON.stringify({ alg: "ES256", kid: keyName, typ: "JWT", nonce }));
   const payload = b64url(JSON.stringify({
-    sub: keyName, iss: "coinbase-cloud",
+    sub: keyName, iss: "cdp",
     nbf: now, exp: now + 120, iat: now,
-    uriref: `${method} ${host}${pathname}`,
+    uris: [`${method} ${host}${pathname}`],
   }));
 
   const sigInput = `${header}.${payload}`;
@@ -48,7 +49,7 @@ export async function createUserWallet(): Promise<string> {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${jwt}`,
     },
-    body: JSON.stringify({ network_id: "base-mainnet" }),
+    body: JSON.stringify({ wallet: { network_id: "base-mainnet" } }),
   });
 
   if (!res.ok) {

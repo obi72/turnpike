@@ -284,7 +284,7 @@ async function createSplitterWallet({ providerWallet, priceUnits, platformFee, e
   const platformPct = 100 - providerPct;
 
   try {
-    const walletRes = await cdpFetch(`${CDP_BASE}/wallets`, "POST", { network_id: "base-mainnet" }, env);
+    const walletRes = await cdpFetch(`${CDP_BASE}/wallets`, "POST", { wallet: { network_id: "base-mainnet" } }, env);
     if (!walletRes.ok) throw new Error(`CDP ${walletRes.status}`);
     const wallet = await walletRes.json();
     if (!wallet?.default_address?.address_id) throw new Error("CDP response missing address");
@@ -415,11 +415,12 @@ async function makeCdpJwt(method, url, env) {
   const now = Math.floor(Date.now() / 1000);
   const { host, pathname } = new URL(url);
   const keyName = `organizations/${env.CDP_PROJECT_ID}/apiKeys/${env.CDP_KEY_ID}`;
-  const header  = b64url(JSON.stringify({ alg: "ES256", kid: keyName, typ: "JWT" }));
+  const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2,'0')).join('');
+  const header  = b64url(JSON.stringify({ alg: "ES256", kid: keyName, typ: "JWT", nonce }));
   const payload = b64url(JSON.stringify({
-    sub: keyName, iss: "coinbase-cloud",
+    sub: keyName, iss: "cdp",
     nbf: now, exp: now + 120, iat: now,
-    uriref: `${method} ${host}${pathname}`,
+    uris: [`${method} ${host}${pathname}`],
   }));
   const sigInput = `${header}.${payload}`;
   const sig = await crypto.subtle.sign(
