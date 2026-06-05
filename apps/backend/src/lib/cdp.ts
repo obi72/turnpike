@@ -1,3 +1,5 @@
+import { randomBytes } from "crypto";
+
 const CDP_BASE = "https://api.cdp.coinbase.com/platform/v1";
 
 function b64url(input: string | ArrayBuffer): string {
@@ -20,7 +22,7 @@ async function makeCdpJwt(method: string, url: string): Promise<string> {
 
   const now  = Math.floor(Date.now() / 1000);
   const { host, pathname } = new URL(url);
-  const nonce = require("crypto").randomBytes(16).toString("hex");
+  const nonce = randomBytes(16).toString("hex");
 
   const header  = b64url(JSON.stringify({ alg: "ES256", kid: keyName, typ: "JWT", nonce }));
   const payload = b64url(JSON.stringify({

@@ -75,7 +75,7 @@ router.post("/users/:id/create-wallet", async (req, res) => {
 
   let walletAddress: string;
   try {
-    walletAddress = await createUserWallet();
+    walletAddress = await createSplitterWallet("", process.env.PLATFORM_WALLET ?? "");
   } catch (err: any) {
     return res.status(502).json({ error: err.message });
   }
