@@ -18,7 +18,7 @@ export default function FileUpload({ userId, walletAddress }: Props) {
 
   const priceNum   = parseFloat(price) || 0;
   const priceUnits = Math.round(priceNum * 1_000_000);
-  const fee        = priceUnits >= 100000 ? priceNum * 0.1 : priceUnits >= 50000 ? 0.01 : null;
+  const fee        = priceUnits >= 50000 ? priceNum * 0.15 : null;
   const youGet     = fee !== null ? priceNum - fee : null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -122,7 +122,7 @@ export default function FileUpload({ userId, walletAddress }: Props) {
         />
         {youGet !== null && (
           <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4 }}>
-            You receive ${youGet.toFixed(2)} · {priceNum >= 0.10 ? "10% fee" : "$0.01 flat fee"}
+            You receive ${youGet.toFixed(4).replace(/\.?0+$/, "")} · 15% platform fee
           </p>
         )}
       </div>

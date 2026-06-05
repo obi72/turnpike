@@ -20,8 +20,7 @@ export default function RevenueClient() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Fee model: $0.01 flat for $0.05–$0.09, 10% for $0.10+
-  // Revenue page shows fee model reference and top publishers by file count
+  // Fee model: 15% flat on all prices
   return (
     <div>
       <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 24 }}>Revenue</h1>
@@ -42,12 +41,11 @@ export default function RevenueClient() {
           </thead>
           <tbody>
             {[
-              { price: "$0.05", fee: "$0.01 flat", publisher: "$0.04" },
-              { price: "$0.09", fee: "$0.01 flat", publisher: "$0.08" },
-              { price: "$0.10", fee: "$0.01 (10%)", publisher: "$0.09" },
-              { price: "$0.25", fee: "$0.025 (10%)", publisher: "$0.225" },
-              { price: "$1.00", fee: "$0.10 (10%)", publisher: "$0.90" },
-              { price: "$5.00", fee: "$0.50 (10%)", publisher: "$4.50" },
+              { price: "$0.05", fee: "$0.0075 (15%)", publisher: "$0.0425" },
+              { price: "$0.10", fee: "$0.015 (15%)",  publisher: "$0.085"  },
+              { price: "$0.25", fee: "$0.0375 (15%)", publisher: "$0.2125" },
+              { price: "$1.00", fee: "$0.15 (15%)",   publisher: "$0.85"   },
+              { price: "$5.00", fee: "$0.75 (15%)",   publisher: "$4.25"   },
             ].map(row => (
               <tr key={row.price}>
                 <td style={{ fontFamily: "monospace" }}>{row.price}</td>
