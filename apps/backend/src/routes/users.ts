@@ -4,14 +4,50 @@ import { createSplitterWallet } from "../lib/cdp.js";
 
 const router = Router();
 
-// Called by user-app after Supabase auth to ensure user row + wallet exist
+/**
+ * Sync user after login.
+ * Supports two modes:
+ *   - userId + email  → Supabase-auth user (Google OAuth, existing)
+ *   - email only      → cdp-hooks email-OTP user: find or create Supabase auth user
+ * Optional: walletAddress to save in the same call.
+ */
 router.post("/users/sync", async (req, res) => {
-  const { userId, email } = req.body;
-  if (!userId || !email) return res.status(400).json({ error: "userId and email required" });
+  const { userId, email, walletAddress } = req.body;
+  if (!email) return res.status(400).json({ error: "email required" });
+
+  let finalUserId = userId as string | undefined;
+
+  if (!finalUserId) {
+    // Look up existing user by email in public.users
+    const { data: existing } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (existing) {
+      finalUserId = existing.id;
+    } else {
+      // Create a confirmed Supabase auth user (no password — auth is handled by cdp-hooks)
+      const { data: authData, error: authError } = await (supabase.auth as any).admin.createUser({
+        email,
+        email_confirm: true,
+      });
+      if (authError) return res.status(500).json({ error: authError.message });
+      finalUserId = authData.user!.id;
+    }
+  }
+
+  const updates: Record<string, unknown> = {
+    id: finalUserId,
+    email,
+    last_active_at: new Date().toISOString(),
+  };
+  if (walletAddress) updates.wallet_address = walletAddress;
 
   const { data, error } = await supabase
     .from("users")
-    .upsert({ id: userId, email, last_active_at: new Date().toISOString() }, { onConflict: "id" })
+    .upsert(updates, { onConflict: "id" })
     .select()
     .single();
 
@@ -24,7 +60,6 @@ router.post("/users/:id/activate-publisher", async (req, res) => {
   const { id } = req.params;
   const { walletAddress } = req.body;
 
-  // Check if splitter wallet already exists
   const { data: existing } = await supabase
     .from("users")
     .select("splitter_address")
@@ -34,7 +69,6 @@ router.post("/users/:id/activate-publisher", async (req, res) => {
   const updates: Record<string, unknown> = { is_publisher: true };
   if (walletAddress) updates.wallet_address = walletAddress;
 
-  // Create splitter wallet once, only if provider wallet is known
   if (!existing?.splitter_address && walletAddress) {
     try {
       const splitterAddress = await createSplitterWallet(
@@ -44,7 +78,7 @@ router.post("/users/:id/activate-publisher", async (req, res) => {
       updates.splitter_address = splitterAddress;
     } catch (err: any) {
       console.error("Splitter wallet creation failed, using provider wallet:", err.message);
-      updates.splitter_address = walletAddress; // fallback
+      updates.splitter_address = walletAddress;
     }
   }
 
@@ -59,39 +93,7 @@ router.post("/users/:id/activate-publisher", async (req, res) => {
   res.json(data);
 });
 
-// Create CDP wallet and store address
-router.post("/users/:id/create-wallet", async (req, res) => {
-  const { id } = req.params;
-
-  const { data: existing } = await supabase
-    .from("users")
-    .select("wallet_address")
-    .eq("id", id)
-    .single();
-
-  if (existing?.wallet_address) {
-    return res.json({ walletAddress: existing.wallet_address });
-  }
-
-  let walletAddress: string;
-  try {
-    walletAddress = await createSplitterWallet("", process.env.PLATFORM_WALLET ?? "");
-  } catch (err: any) {
-    return res.status(502).json({ error: err.message });
-  }
-
-  const { data, error } = await supabase
-    .from("users")
-    .update({ wallet_address: walletAddress })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ walletAddress: data.wallet_address });
-});
-
-// Store wallet address (called after CDP wallet creation)
+// Store wallet address
 router.post("/users/:id/wallet", async (req, res) => {
   const { id } = req.params;
   const { walletAddress } = req.body;
