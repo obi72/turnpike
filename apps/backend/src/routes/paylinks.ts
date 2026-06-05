@@ -20,12 +20,24 @@ const CreateLinkSchema = z.object({
 router.post("/files/upload", upload.single("file"), async (req: any, res) => {
   if (!req.file) return res.status(400).json({ error: "file required" });
 
+  const ownerId       = req.body.ownerId        ?? "";
+  const providerWallet = req.body.providerWallet ?? "";
+
+  // Get publisher's splitter address
+  const { data: userProfile } = await supabase
+    .from("users")
+    .select("splitter_address")
+    .eq("id", ownerId)
+    .single();
+  const splitterAddress = userProfile?.splitter_address ?? providerWallet;
+
   const formData = new FormData();
-  formData.append("file", new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname);
-  formData.append("ownerId",        req.body.ownerId        ?? "");
-  formData.append("price",          req.body.price          ?? "");
-  formData.append("description",    req.body.description    ?? req.file.originalname);
-  formData.append("providerWallet", req.body.providerWallet ?? "");
+  formData.append("file",            new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname);
+  formData.append("ownerId",         ownerId);
+  formData.append("price",           req.body.price          ?? "");
+  formData.append("description",     req.body.description    ?? req.file.originalname);
+  formData.append("providerWallet",  providerWallet);
+  formData.append("splitterAddress", splitterAddress);
 
   const workerRes = await workerFetch("/api/files/upload", { method: "POST", body: formData as any });
   const data = await workerRes.json();
@@ -40,10 +52,18 @@ router.post("/paylinks", async (req, res) => {
   const priceUnits = parseInt(price);
   if (priceUnits < 50000) return res.status(400).json({ error: "Minimum price is $0.05" });
 
+  // Get publisher's splitter address (created once at publisher activation)
+  const { data: userProfile } = await supabase
+    .from("users")
+    .select("splitter_address")
+    .eq("id", ownerId)
+    .single();
+  const splitterAddress = userProfile?.splitter_address ?? providerWallet;
+
   const slug = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
 
   try {
-    const result = await createPayLink({ slug, secretUrl, price, description, ownerId, providerWallet });
+    const result = await createPayLink({ slug, secretUrl, price, description, ownerId, providerWallet, splitterAddress });
 
     // Save to Supabase content table
     await supabase.from("content").insert({

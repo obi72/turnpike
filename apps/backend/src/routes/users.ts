@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
-import { createUserWallet } from "../lib/cdp.js";
+import { createSplitterWallet } from "../lib/cdp.js";
 
 const router = Router();
 
@@ -19,13 +19,34 @@ router.post("/users/sync", async (req, res) => {
   res.json(data);
 });
 
-// Activate publisher role for a user
+// Activate publisher role for a user — creates CDP splitter wallet (once)
 router.post("/users/:id/activate-publisher", async (req, res) => {
   const { id } = req.params;
   const { walletAddress } = req.body;
 
+  // Check if splitter wallet already exists
+  const { data: existing } = await supabase
+    .from("users")
+    .select("splitter_address")
+    .eq("id", id)
+    .single();
+
   const updates: Record<string, unknown> = { is_publisher: true };
   if (walletAddress) updates.wallet_address = walletAddress;
+
+  // Create splitter wallet once, only if provider wallet is known
+  if (!existing?.splitter_address && walletAddress) {
+    try {
+      const splitterAddress = await createSplitterWallet(
+        walletAddress,
+        process.env.PLATFORM_WALLET!,
+      );
+      updates.splitter_address = splitterAddress;
+    } catch (err: any) {
+      console.error("Splitter wallet creation failed, using provider wallet:", err.message);
+      updates.splitter_address = walletAddress; // fallback
+    }
+  }
 
   const { data, error } = await supabase
     .from("users")

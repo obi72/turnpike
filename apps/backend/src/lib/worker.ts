@@ -22,6 +22,7 @@ export async function createPayLink(data: {
   description?: string;
   ownerId: string;
   providerWallet: string;
+  splitterAddress: string;
 }) {
   const res = await workerFetch("/api/routes", {
     method: "POST",

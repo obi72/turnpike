@@ -123,10 +123,10 @@ async function handlePaywall(request, env) {
 async function handleCreateRoute(request, env) {
   if (!checkAuth(request, env)) return new Response("Unauthorized", { status: 401 });
 
-  const { slug, secretUrl, price, description, ownerId, providerWallet } = await request.json();
+  const { slug, secretUrl, price, description, ownerId, providerWallet, splitterAddress } = await request.json();
 
-  if (!slug || !secretUrl || !price || !providerWallet || !ownerId) {
-    return Response.json({ error: "slug, secretUrl, price, ownerId, providerWallet required" }, { status: 400 });
+  if (!slug || !secretUrl || !price || !providerWallet || !ownerId || !splitterAddress) {
+    return Response.json({ error: "slug, secretUrl, price, ownerId, providerWallet, splitterAddress required" }, { status: 400 });
   }
 
   const existing = await env.ROUTES.get(slug);
@@ -135,8 +135,6 @@ async function handleCreateRoute(request, env) {
   let fee;
   try { fee = calculateFee(parseInt(price)); }
   catch (e) { return Response.json({ error: e.message }, { status: 400 }); }
-
-  const splitterAddress = await createSplitterWallet({ providerWallet, priceUnits: parseInt(price), platformFee: fee.platformFee, env });
 
   const route = {
     type: "url", secretUrl, price, description: description ?? slug,
@@ -188,7 +186,7 @@ async function handleUpload(request, env) {
   });
 
   const slug = await uniqueSlug(Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10), env);
-  const splitterAddress = await createSplitterWallet({ providerWallet, priceUnits: parseInt(price), platformFee: fee.platformFee, env });
+  const splitterAddress = formData.get("splitterAddress") ?? providerWallet;
 
   const route = {
     type: "file", r2Key, fileName: file.name, fileSize: file.size,
