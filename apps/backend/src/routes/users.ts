@@ -93,16 +93,19 @@ router.post("/users/:id/activate-publisher", async (req, res) => {
   res.json(data);
 });
 
-// Store wallet address
+// Store wallet address (and optional passkey credential ID)
 router.post("/users/:id/wallet", async (req, res) => {
   const { id } = req.params;
-  const { walletAddress } = req.body;
+  const { walletAddress, credentialId } = req.body;
 
   if (!walletAddress) return res.status(400).json({ error: "walletAddress required" });
 
+  const updates: Record<string, string> = { wallet_address: walletAddress };
+  if (credentialId) updates.passkey_credential_id = credentialId;
+
   const { data, error } = await supabase
     .from("users")
-    .update({ wallet_address: walletAddress })
+    .update(updates)
     .eq("id", id)
     .select()
     .single();

@@ -16,14 +16,15 @@ export async function apiFetch(path: string, options?: RequestInit) {
 }
 
 export const api = {
-  syncUser: (userId: string, email: string) =>
-    apiFetch("/users/sync", { method: "POST", body: JSON.stringify({ userId, email }) }),
+  // email-only (cdp-hooks login) or userId+email (Google OAuth)
+  syncUser: (email: string, walletAddress?: string, userId?: string) =>
+    apiFetch("/users/sync", { method: "POST", body: JSON.stringify({ userId, email, walletAddress }) }),
 
   activatePublisher: (userId: string, walletAddress?: string) =>
     apiFetch(`/users/${userId}/activate-publisher`, { method: "POST", body: JSON.stringify({ walletAddress }) }),
 
-  saveWallet: (userId: string, walletAddress: string) =>
-    apiFetch(`/users/${userId}/wallet`, { method: "POST", body: JSON.stringify({ walletAddress }) }),
+  saveWallet: (userId: string, walletAddress: string, credentialId?: string) =>
+    apiFetch(`/users/${userId}/wallet`, { method: "POST", body: JSON.stringify({ walletAddress, credentialId }) }),
 
   getPayLinks: (ownerId: string) =>
     apiFetch(`/paylinks?ownerId=${ownerId}`),

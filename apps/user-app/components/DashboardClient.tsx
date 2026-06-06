@@ -43,36 +43,22 @@ export default function DashboardClient({
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1rem" }}>
-      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h1 style={{ fontSize: 20, fontWeight: 600 }}>Dashboard</h1>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span style={{ fontSize: 12, color: "var(--text-2)" }}>{user.email}</span>
-          <button
-            className="btn-ghost"
-            style={{ fontSize: 12, padding: "5px 12px" }}
-            onClick={handleLogout}
-          >
+          <button className="btn-ghost" style={{ fontSize: 12, padding: "5px 12px" }} onClick={handleLogout}>
             Sign out
           </button>
         </div>
       </div>
 
-      {/* Wallet balance */}
-      <WalletCard
-        userId={user.id}
-        walletAddress={profile?.wallet_address ?? null}
-      />
+      <WalletCard userId={user.id} userEmail={user.email ?? ""} walletAddress={profile?.wallet_address ?? null} />
 
-      {/* Publisher activation banner — always visible */}
       {!profile?.is_publisher && (
-        <PublisherBanner
-          userId={user.id}
-          walletAddress={profile?.wallet_address ?? null}
-        />
+        <PublisherBanner userId={user.id} walletAddress={profile?.wallet_address ?? null} />
       )}
 
-      {/* Publisher content list */}
       {profile?.is_publisher && <ContentList ownerId={user.id} />}
     </div>
   );
