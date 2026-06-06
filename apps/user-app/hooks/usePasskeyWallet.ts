@@ -1,17 +1,16 @@
 "use client";
 import { useState } from "react";
-import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
 
-async function getPrfSalt(): Promise<Uint8Array> {
+// Fixed salt — same on every device for the same passkey (deterministic wallet)
+async function getPrfSalt(): Promise<ArrayBuffer> {
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     "raw", enc.encode("turnpike-wallet-v1"), "HKDF", false, ["deriveBits"]
   );
-  const bits = await crypto.subtle.deriveBits(
+  return crypto.subtle.deriveBits(
     { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info: enc.encode("prf-salt") },
     keyMaterial, 256
   );
-  return new Uint8Array(bits);
 }
 
 async function prfOutputToAddress(prfOutput: ArrayBuffer): Promise<string> {
@@ -21,9 +20,14 @@ async function prfOutputToAddress(prfOutput: ArrayBuffer): Promise<string> {
   return privateKeyToAccount(hex).address;
 }
 
-function toBase64Url(buf: Uint8Array): string {
-  return btoa(String.fromCharCode(...buf))
+function bufToBase64Url(buf: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+function base64UrlToBuf(b64: string): ArrayBuffer {
+  const bin = atob(b64.replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(bin, c => c.charCodeAt(0)).buffer;
 }
 
 export function usePasskeyWallet() {
@@ -34,33 +38,32 @@ export function usePasskeyWallet() {
     setLoading(true); setError(null);
     try {
       const salt = await getPrfSalt();
-      const challenge = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+      const challenge = crypto.getRandomValues(new Uint8Array(32));
+      const userId = new TextEncoder().encode(userEmail);
 
-      const registration = await startRegistration({
-        optionsJSON: {
+      const credential = await navigator.credentials.create({
+        publicKey: {
           challenge,
           rp: { name: "Turnpike", id: window.location.hostname },
-          user: {
-            id: toBase64Url(new TextEncoder().encode(userEmail)),
-            name: userEmail,
-            displayName: userEmail,
-          },
+          user: { id: userId, name: userEmail, displayName: userEmail },
           pubKeyCredParams: [{ type: "public-key", alg: -7 }],
           authenticatorSelection: { residentKey: "required", userVerification: "required" },
-          extensions: { prf: { eval: { first: toBase64Url(salt) } } } as any,
+          extensions: { prf: { eval: { first: salt } } } as any,
         },
-      });
+      }) as PublicKeyCredential | null;
 
-      const prfResult = (registration as any).clientExtensionResults?.prf?.results?.first;
-      if (!prfResult) {
+      if (!credential) throw new Error("Passkey creation cancelled.");
+
+      const prfResults = (credential.getClientExtensionResults() as any)?.prf?.results;
+      if (!prfResults?.first) {
         throw new Error(
           "Your browser does not support WebAuthn PRF. Please use Chrome 116+, Safari 17+, Firefox 119+, or Edge 116+."
         );
       }
 
-      const prfBytes = Uint8Array.from(atob(prfResult.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
-      const address = await prfOutputToAddress(prfBytes.buffer);
-      return { address, credentialId: registration.id };
+      const address = await prfOutputToAddress(prfResults.first as ArrayBuffer);
+      const credentialId = bufToBase64Url(credential.rawId);
+      return { address, credentialId };
     } catch (e: any) {
       setError(e.message ?? "Wallet setup failed.");
       return null;
@@ -73,23 +76,24 @@ export function usePasskeyWallet() {
     setLoading(true); setError(null);
     try {
       const salt = await getPrfSalt();
-      const challenge = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+      const challenge = crypto.getRandomValues(new Uint8Array(32));
 
-      const authentication = await startAuthentication({
-        optionsJSON: {
+      const credential = await navigator.credentials.get({
+        publicKey: {
           challenge,
           rpId: window.location.hostname,
-          allowCredentials: [{ id: credentialId, type: "public-key" }],
+          allowCredentials: [{ id: base64UrlToBuf(credentialId), type: "public-key" }],
           userVerification: "required",
-          extensions: { prf: { eval: { first: toBase64Url(salt) } } } as any,
+          extensions: { prf: { eval: { first: salt } } } as any,
         },
-      });
+      }) as PublicKeyCredential | null;
 
-      const prfResult = (authentication as any).clientExtensionResults?.prf?.results?.first;
-      if (!prfResult) throw new Error("PRF output not available.");
+      if (!credential) throw new Error("Passkey authentication cancelled.");
 
-      const prfBytes = Uint8Array.from(atob(prfResult.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
-      return await prfOutputToAddress(prfBytes.buffer);
+      const prfResults = (credential.getClientExtensionResults() as any)?.prf?.results;
+      if (!prfResults?.first) throw new Error("PRF output not available.");
+
+      return await prfOutputToAddress(prfResults.first as ArrayBuffer);
     } catch (e: any) {
       setError(e.message ?? "Wallet recovery failed.");
       return null;
