@@ -3,8 +3,8 @@ import { Router } from "express";
 const router = Router();
 
 const CROSSMINT_BASE = "https://staging.crossmint.com/api/2022-06-09";
-// USDC on Base mainnet
-const USDC_BASE = "base:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+// USDC on Base Sepolia (staging/test) — switch to base mainnet contract for production
+const USDC_BASE = "base-sepolia:0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
 router.post("/crossmint/order", async (req, res) => {
   const { walletAddress, email, amount = 20 } = req.body;
