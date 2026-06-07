@@ -27,7 +27,7 @@ function openTransak(walletAddress: string, userEmail: string, mode: "BUY" | "SE
     redirectURL:            "https://app.trnpk.net/dashboard",
     ...(mode === "SELL" ? { defaultFiatAmount: "50" } : { defaultFiatAmount: "20" }),
   });
-  window.open(`https://global.transak.com?${params}`, "_blank", "width=500,height=700,noopener");
+  window.open(`https://staging-global.transak.com?${params}`, "_blank", "width=500,height=700,noopener");
 }
 
 export default function WalletCard({ userId, userEmail, walletAddress }: Props) {
