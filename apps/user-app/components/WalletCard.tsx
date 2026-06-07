@@ -24,12 +24,10 @@ function openTransak(walletAddress: string, userEmail: string, mode: "BUY" | "SE
     email:                  userEmail,
     defaultFiatCurrency:    "EUR",
     themeColor:             "000000",
-    environment:            "STAGING",
     redirectURL:            "https://app.trnpk.net/dashboard",
     ...(mode === "SELL" ? { defaultFiatAmount: "50" } : { defaultFiatAmount: "20" }),
   });
-  const baseUrl = "https://staging-global.transak.com";
-  window.open(`${baseUrl}?${params}`, "_blank", "width=500,height=700,noopener");
+  window.open(`https://global.transak.com?${params}`, "_blank", "width=500,height=700,noopener");
 }
 
 export default function WalletCard({ userId, userEmail, walletAddress }: Props) {
