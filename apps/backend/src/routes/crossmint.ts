@@ -27,13 +27,12 @@ router.post("/crossmint/order", async (req, res) => {
           receiptEmail: email ?? "",
         },
         lineItems: [{
-          tokenLocator:        `usdc:base`,
-          callData: {
+          tokenLocator: `base:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`,
+          recipient: {
             walletAddress,
           },
-          quantity: { quantity: 1 },
-          payment: {
-            amount:   String(amount),
+          quantity: {
+            amount: String(amount),
             currency: "usd",
           },
         }],
