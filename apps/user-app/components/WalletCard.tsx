@@ -13,29 +13,15 @@ interface Props {
   walletAddress: string | null;
 }
 
-function openTransak(walletAddress: string, userEmail: string, mode: "BUY" | "SELL") {
-  const apiKey = process.env.NEXT_PUBLIC_TRANSAK_API_KEY ?? "";
-  const params = new URLSearchParams({
-    apiKey,
-    productsAvailed:        mode,
-    defaultCryptoCurrency:  "USDC",
-    network:                "base",
-    walletAddress,
-    email:                  userEmail,
-    defaultFiatCurrency:    "EUR",
-    themeColor:             "000000",
-    redirectURL:            "https://app.trnpk.net/dashboard",
-    ...(mode === "SELL" ? { defaultFiatAmount: "50" } : { defaultFiatAmount: "20" }),
-  });
-  window.open(`https://staging-global.transak.com?${params}`, "_blank", "width=500,height=700,noopener");
-}
-
 export default function WalletCard({ userId, userEmail, walletAddress }: Props) {
   const router = useRouter();
   const { setupWallet, loading: connecting, error: walletError } = usePasskeyWallet();
 
-  const [balance, setBalance]       = useState<number | null>(null);
-  const [loading, setLoading]       = useState(false);
+  const [balance, setBalance]           = useState<number | null>(null);
+  const [loading, setLoading]           = useState(false);
+  const [onrampLoading, setOnrampLoading] = useState(false);
+  const [onrampError, setOnrampError]   = useState<string | null>(null);
+  const [offrampLoading, setOfframpLoading] = useState(false);
   const [offrampError, setOfframpError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,11 +52,31 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
     } catch {}
   }
 
-  function handleWithdraw() {
+  async function handleAddFunds() {
+    if (!walletAddress) return;
+    setOnrampLoading(true); setOnrampError(null);
+    try {
+      const { url } = await api.transakOnrampSession(walletAddress, userEmail);
+      window.open(url, "_blank", "width=500,height=700,noopener");
+    } catch {
+      setOnrampError("Could not open payment. Please try again.");
+    } finally {
+      setOnrampLoading(false);
+    }
+  }
+
+  async function handleWithdraw() {
     if (!walletAddress) return;
     if ((balance ?? 0) < 10) { setOfframpError("Minimum withdrawal is $10.00"); return; }
-    setOfframpError(null);
-    openTransak(walletAddress, userEmail, "SELL");
+    setOfframpLoading(true); setOfframpError(null);
+    try {
+      const { url } = await api.transakOfframpSession(walletAddress, balance!, userEmail);
+      window.open(url, "_blank", "width=500,height=700,noopener");
+    } catch {
+      setOfframpError("Could not open withdrawal. Please try again.");
+    } finally {
+      setOfframpLoading(false);
+    }
   }
 
   // ── No account yet ─────────────────────────────────────────────────────────
@@ -114,17 +120,17 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
 
       <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
         <button className="btn-primary" style={{ fontSize: 13 }}
-          onClick={() => openTransak(walletAddress, userEmail, "BUY")}>
-          + Add funds
+          onClick={handleAddFunds} disabled={onrampLoading}>
+          {onrampLoading ? "Opening…" : "+ Add funds"}
         </button>
         <button className="btn-ghost" style={{ fontSize: 13 }}
-          onClick={handleWithdraw}
-          disabled={(balance ?? 0) < 10}
+          onClick={handleWithdraw} disabled={offrampLoading || (balance ?? 0) < 10}
           title={(balance ?? 0) < 10 ? "Minimum withdrawal is $10.00" : undefined}>
-          Withdraw
+          {offrampLoading ? "…" : "Withdraw"}
         </button>
       </div>
 
+      {onrampError  && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{onrampError}</p>}
       {offrampError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{offrampError}</p>}
     </div>
   );

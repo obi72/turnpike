@@ -38,6 +38,9 @@ export const api = {
   stripeOnrampSession: (walletAddress: string, amount: number) =>
     apiFetch("/stripe/onramp-session", { method: "POST", body: JSON.stringify({ walletAddress, amount }) }),
 
+  transakOnrampSession: (walletAddress: string, email?: string, amount?: number) =>
+    apiFetch("/transak/onramp-session", { method: "POST", body: JSON.stringify({ walletAddress, email, amount }) }),
+
   transakOfframpSession: (walletAddress: string, amount: number, email?: string) =>
     apiFetch("/transak/offramp-session", { method: "POST", body: JSON.stringify({ walletAddress, amount, email }) }),
 
