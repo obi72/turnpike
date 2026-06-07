@@ -13,17 +13,30 @@ interface Props {
   walletAddress: string | null;
 }
 
+function openTransak(walletAddress: string, userEmail: string, mode: "BUY" | "SELL") {
+  const apiKey = process.env.NEXT_PUBLIC_TRANSAK_API_KEY ?? "";
+  const params = new URLSearchParams({
+    apiKey,
+    productsAvailed:        mode,
+    defaultCryptoCurrency:  "USDC",
+    network:                "base",
+    walletAddress,
+    email:                  userEmail,
+    defaultFiatCurrency:    "EUR",
+    themeColor:             "000000",
+    redirectURL:            "https://app.trnpk.net/dashboard",
+    ...(mode === "SELL" ? { defaultFiatAmount: "50" } : { defaultFiatAmount: "20" }),
+  });
+  window.open(`https://global.transak.com?${params}`, "_blank", "width=500,height=700,noopener");
+}
+
 export default function WalletCard({ userId, userEmail, walletAddress }: Props) {
   const router = useRouter();
   const { setupWallet, loading: connecting, error: walletError } = usePasskeyWallet();
 
-  const [balance, setBalance]             = useState<number | null>(null);
-  const [balanceLoading, setBalanceLoading] = useState(false);
-  const [onrampOrder, setOnrampOrder]     = useState<{ orderId: string; clientSecret: string } | null>(null);
-  const [onrampLoading, setOnrampLoading] = useState(false);
-  const [onrampError, setOnrampError]     = useState<string | null>(null);
-  const [offrampLoading, setOfframpLoading] = useState(false);
-  const [offrampError, setOfframpError]   = useState<string | null>(null);
+  const [balance, setBalance]       = useState<number | null>(null);
+  const [loading, setLoading]       = useState(false);
+  const [offrampError, setOfframpError] = useState<string | null>(null);
 
   useEffect(() => {
     if (walletAddress) loadBalance();
@@ -31,7 +44,7 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
 
   async function loadBalance() {
     if (!walletAddress) return;
-    setBalanceLoading(true);
+    setLoading(true);
     try {
       const res  = await fetch(
         `https://api.basescan.org/api?module=account&action=tokenbalance` +
@@ -41,7 +54,7 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
       const raw = Number(data.result);
       setBalance(isNaN(raw) ? 0 : raw / 1e6);
     } catch { setBalance(0); }
-    finally { setBalanceLoading(false); }
+    finally { setLoading(false); }
   }
 
   async function handleSetupWallet() {
@@ -53,28 +66,11 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
     } catch {}
   }
 
-  async function openOnramp() {
+  function handleWithdraw() {
     if (!walletAddress) return;
-    setOnrampLoading(true); setOnrampError(null); setOnrampOrder(null);
-    try {
-      const { orderId, clientSecret } = await api.crossmintOrder(walletAddress, userEmail, 20);
-      setOnrampOrder({ orderId, clientSecret });
-    } catch (err: any) {
-      setOnrampError("Could not open payment. Please try again.");
-    } finally {
-      setOnrampLoading(false);
-    }
-  }
-
-  async function openOfframp() {
-    if (!walletAddress || balance === null) return;
-    if (balance < 10) { setOfframpError("Minimum withdrawal is $10.00"); return; }
-    setOfframpLoading(true); setOfframpError(null);
-    try {
-      const { url } = await api.transakOfframpSession(walletAddress, balance);
-      window.open(url, "_blank", "width=480,height=700");
-    } catch (err: any) { setOfframpError(err.message); }
-    finally { setOfframpLoading(false); }
+    if ((balance ?? 0) < 10) { setOfframpError("Minimum withdrawal is $10.00"); return; }
+    setOfframpError(null);
+    openTransak(walletAddress, userEmail, "SELL");
   }
 
   // ── No account yet ─────────────────────────────────────────────────────────
@@ -107,8 +103,8 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
         Balance
       </p>
       <p style={{ fontSize: 42, fontWeight: 600, marginBottom: 4 }}>
-        {balanceLoading ? "…" : balance !== null ? `$${balance.toFixed(2)}` : "—"}
-        <button onClick={loadBalance} disabled={balanceLoading}
+        {loading ? "…" : balance !== null ? `$${balance.toFixed(2)}` : "—"}
+        <button onClick={loadBalance} disabled={loading}
           style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-3)", marginLeft: 8, verticalAlign: "middle", padding: 0, lineHeight: 1 }}
           title="Refresh">↻</button>
       </p>
@@ -118,101 +114,18 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
 
       <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
         <button className="btn-primary" style={{ fontSize: 13 }}
-          onClick={onrampOrder ? () => setOnrampOrder(null) : openOnramp}
-          disabled={onrampLoading}>
-          {onrampLoading ? "Opening…" : onrampOrder ? "✕ Close" : "+ Add funds"}
+          onClick={() => openTransak(walletAddress, userEmail, "BUY")}>
+          + Add funds
         </button>
         <button className="btn-ghost" style={{ fontSize: 13 }}
-          onClick={openOfframp}
-          disabled={offrampLoading || (balance ?? 0) < 10}
+          onClick={handleWithdraw}
+          disabled={(balance ?? 0) < 10}
           title={(balance ?? 0) < 10 ? "Minimum withdrawal is $10.00" : undefined}>
-          {offrampLoading ? "…" : "Withdraw"}
+          Withdraw
         </button>
       </div>
 
-      {/* Crossmint Embedded Checkout */}
-      {onrampOrder && (
-        <CrossmintCheckout
-          orderId={onrampOrder.orderId}
-          clientSecret={onrampOrder.clientSecret}
-          userEmail={userEmail}
-          onSuccess={() => { setOnrampOrder(null); setTimeout(loadBalance, 3000); }}
-        />
-      )}
-
-      {onrampError  && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{onrampError}</p>}
       {offrampError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{offrampError}</p>}
     </div>
-  );
-}
-
-// ── Crossmint Embedded Checkout ────────────────────────────────────────────
-function CrossmintCheckout({
-  orderId, clientSecret, userEmail, onSuccess,
-}: {
-  orderId: string;
-  clientSecret: string;
-  userEmail: string;
-  onSuccess: () => void;
-}) {
-  const clientKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY ?? "";
-
-  useEffect(() => {
-    let Checkout: any;
-    (async () => {
-      try {
-        const { CrossmintProvider, CrossmintEmbeddedCheckout } = await import("@crossmint/client-sdk-react-ui");
-        // Dynamically rendered — handled below via dangerouslySetInnerHTML workaround
-        // We render via the SDK's imperative mount if available, otherwise use component
-      } catch {}
-    })();
-  }, []);
-
-  return (
-    <div style={{ marginTop: 16, textAlign: "left" }}>
-      <CrossmintEmbeddedCheckoutWrapper
-        orderId={orderId}
-        clientSecret={clientSecret}
-        clientKey={clientKey}
-        userEmail={userEmail}
-        onSuccess={onSuccess}
-      />
-    </div>
-  );
-}
-
-function CrossmintEmbeddedCheckoutWrapper({
-  orderId, clientSecret, clientKey, userEmail, onSuccess,
-}: {
-  orderId: string;
-  clientSecret: string;
-  clientKey: string;
-  userEmail: string;
-  onSuccess: () => void;
-}) {
-  const [Sdk, setSdk] = useState<any>(null);
-
-  useEffect(() => {
-    import("@crossmint/client-sdk-react-ui").then(m => setSdk(m));
-  }, []);
-
-  if (!Sdk) return <p style={{ fontSize: 13, color: "var(--text-2)", padding: 16 }}>Loading payment…</p>;
-
-  const { CrossmintProvider, CrossmintEmbeddedCheckout } = Sdk;
-
-  return (
-    <CrossmintProvider apiKey={clientKey}>
-      <CrossmintEmbeddedCheckout
-        orderId={orderId}
-        clientSecret={clientSecret}
-        payment={{
-          receiptEmail: userEmail,
-          defaultMethod: "fiat",
-        }}
-        onEvent={(e: any) => {
-          if (e.type === "payment:completed") onSuccess();
-        }}
-      />
-    </CrossmintProvider>
   );
 }
