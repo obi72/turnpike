@@ -36,10 +36,15 @@ async function createTransakSession(widgetParams: Record<string, any>): Promise<
   });
 
   const data = await response.json() as any;
-  if (!response.ok) throw new Error(data?.error ?? "Transak session error");
+  if (!response.ok) {
+    const msg = typeof data?.error === "string" ? data.error
+      : typeof data?.message === "string" ? data.message
+      : JSON.stringify(data);
+    throw new Error(msg);
+  }
 
   const widgetUrl = data?.data?.widgetUrl;
-  if (!widgetUrl) throw new Error("No widgetUrl in Transak response");
+  if (!widgetUrl) throw new Error(`No widgetUrl in response: ${JSON.stringify(data)}`);
   return widgetUrl;
 }
 
