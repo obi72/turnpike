@@ -2,29 +2,52 @@ import { Router } from "express";
 
 const router = Router();
 
-const TRANSAK_API_STAGING = "https://api-gateway-stg.transak.com";
-const TRANSAK_API_PROD    = "https://api-gateway.transak.com";
+const TRANSAK_PARTNER_API = "https://api-stg.transak.com";
+const TRANSAK_GATEWAY_API = "https://api-gateway-stg.transak.com";
+const TRANSAK_WIDGET_BASE = "https://global-stg.transak.com";
 
-function transakApiBase() {
-  const key = process.env.TRANSAK_API_KEY ?? "";
-  // Staging keys typically used with staging gateway
-  return TRANSAK_API_STAGING; // switch to PROD when going live
-}
+// Cache access token in memory (valid 7 days)
+let cachedAccessToken: string | null = null;
+let tokenExpiresAt: number = 0;
 
-function transakWidgetBase() {
-  return "https://global-stg.transak.com"; // switch to global.transak.com for production
+async function getAccessToken(): Promise<string> {
+  if (cachedAccessToken && Date.now() < tokenExpiresAt - 60_000) {
+    return cachedAccessToken;
+  }
+
+  const apiSecret = process.env.TRANSAK_API_SECRET;
+  const apiKey    = process.env.TRANSAK_API_KEY;
+  if (!apiSecret || !apiKey) throw new Error("Transak not configured");
+
+  const response = await fetch(`${TRANSAK_PARTNER_API}/partners/api/v2/refresh-token`, {
+    method: "POST",
+    headers: {
+      "api-secret":   apiSecret,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ apiKey }),
+  });
+
+  const data = await response.json() as any;
+  if (!response.ok) {
+    throw new Error(`Transak token error: ${JSON.stringify(data)}`);
+  }
+
+  cachedAccessToken = data.data.accessToken;
+  tokenExpiresAt    = data.data.expiresAt * 1000; // convert to ms if unix timestamp
+  return cachedAccessToken!;
 }
 
 async function createTransakSession(widgetParams: Record<string, any>): Promise<string> {
-  const apiKey = process.env.TRANSAK_API_KEY;
-  if (!apiKey) throw new Error("Transak not configured");
+  const apiKey      = process.env.TRANSAK_API_KEY;
+  const accessToken = await getAccessToken();
 
-  const response = await fetch(`${transakApiBase()}/api/v2/auth/session`, {
+  const response = await fetch(`${TRANSAK_GATEWAY_API}/api/v2/auth/session`, {
     method: "POST",
     headers: {
-      "accept":       "application/json",
-      "content-type": "application/json",
-      "access-token": process.env.TRANSAK_API_SECRET ?? "",
+      "accept":        "application/json",
+      "content-type":  "application/json",
+      "access-token":  accessToken,
     },
     body: JSON.stringify({
       widgetParams: {
@@ -55,15 +78,15 @@ router.post("/transak/onramp-session", async (req, res) => {
 
   try {
     const url = await createTransakSession({
-      productsAvailed:       "BUY",
-      cryptoCurrencyCode:    "USDC",
-      network:               "base",
+      productsAvailed:          "BUY",
+      cryptoCurrencyCode:       "USDC",
+      network:                  "base",
       walletAddress,
-      email:                 email ?? "",
-      fiatCurrency:          "EUR",
-      fiatAmount:            amount,
-      themeColor:            "000000",
-      redirectURL:           "https://app.trnpk.net/dashboard",
+      email:                    email ?? "",
+      fiatCurrency:             "EUR",
+      fiatAmount:               amount,
+      themeColor:               "000000",
+      redirectURL:              "https://app.trnpk.net/dashboard",
       disableWalletAddressForm: true,
     });
     res.json({ url });
@@ -80,15 +103,15 @@ router.post("/transak/offramp-session", async (req, res) => {
 
   try {
     const url = await createTransakSession({
-      productsAvailed:       "SELL",
-      cryptoCurrencyCode:    "USDC",
-      network:               "base",
+      productsAvailed:    "SELL",
+      cryptoCurrencyCode: "USDC",
+      network:            "base",
       walletAddress,
-      email:                 email ?? "",
-      fiatCurrency:          "EUR",
-      cryptoAmount:          amount,
-      themeColor:            "000000",
-      redirectURL:           "https://app.trnpk.net/dashboard",
+      email:              email ?? "",
+      fiatCurrency:       "EUR",
+      cryptoAmount:       amount,
+      themeColor:         "000000",
+      redirectURL:        "https://app.trnpk.net/dashboard",
     });
     res.json({ url });
   } catch (err: any) {
