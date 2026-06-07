@@ -34,7 +34,7 @@ router.post("/crossmint/order", async (req, res) => {
           receiptEmail: email ?? "",
         },
         recipient: {
-          walletAddress,
+          walletAddress: `base-sepolia:${walletAddress}`,
         },
       }),
     });
