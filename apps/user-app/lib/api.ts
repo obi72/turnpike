@@ -40,4 +40,7 @@ export const api = {
 
   transakOfframpSession: (walletAddress: string, amount: number, email?: string) =>
     apiFetch("/transak/offramp-session", { method: "POST", body: JSON.stringify({ walletAddress, amount, email }) }),
+
+  crossmintOrder: (walletAddress: string, email: string, amount?: number) =>
+    apiFetch("/crossmint/order", { method: "POST", body: JSON.stringify({ walletAddress, email, amount }) }),
 };
