@@ -24,7 +24,7 @@ async function createTransakSession(widgetParams: Record<string, any>): Promise<
     headers: {
       "accept":       "application/json",
       "content-type": "application/json",
-      "access-token": apiKey,
+      "access-token": process.env.TRANSAK_API_SECRET ?? "",
     },
     body: JSON.stringify({
       widgetParams: {
