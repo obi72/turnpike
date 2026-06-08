@@ -5,6 +5,7 @@ import stripeRouter    from "./routes/stripe.js";
 import transakRouter   from "./routes/transak.js";
 import usersRouter     from "./routes/users.js";
 import crossmintRouter from "./routes/crossmint.js";
+import splitRouter     from "./routes/split.js";
 
 const app  = express();
 const port = parseInt(process.env.PORT ?? "3001");
@@ -24,5 +25,6 @@ app.use("/api", stripeRouter);
 app.use("/api", transakRouter);
 app.use("/api", usersRouter);
 app.use("/api", crossmintRouter);
+app.use("/api", splitRouter);
 
 app.listen(port, () => console.log(`Backend running on :${port}`));

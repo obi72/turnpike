@@ -20,7 +20,7 @@ const DOWNLOAD_TTL_DAYS = 30;
 const INACTIVITY_DAYS   = 60;
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url  = new URL(request.url);
     const path = url.pathname;
 
@@ -33,7 +33,7 @@ export default {
     if (path === "/api/account/close"  && request.method === "DELETE") return handleCloseAccount(request, env);
     if (path === "/health"             && request.method === "GET")    return Response.json({ ok: true });
 
-    return handlePaywall(request, env);
+    return handlePaywall(request, env, ctx);
   },
 
   async scheduled(event, env) {
@@ -42,7 +42,7 @@ export default {
 };
 
 // ── Paywall — x402 protocol implementation ────────────────────
-async function handlePaywall(request, env) {
+async function handlePaywall(request, env, ctx) {
   const slug = new URL(request.url).pathname.replace(/^\//, "");
   if (!slug) return new Response("Not found", { status: 404 });
 
@@ -97,7 +97,10 @@ async function handlePaywall(request, env) {
     });
   }
 
-  // Step 3: Payment verified → deliver content
+  // Step 3: Payment verified → trigger split in background, deliver content
+  if (route.splitterAddress && route.splitterAddress !== route.providerWallet) {
+    ctx.waitUntil(triggerSplit(route.splitterAddress, env));
+  }
   await updateOwnerActivity(route.ownerId, env);
 
   if (route.type === "file") {
@@ -276,6 +279,19 @@ async function handleListRoutes(request, env) {
     };
   }));
   return Response.json(routes.filter(Boolean));
+}
+
+// ── Trigger on-chain split via backend ────────────────────────
+async function triggerSplit(splitterAddress, env) {
+  try {
+    await fetch(`${env.BACKEND_URL}/api/split`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${env.ADMIN_SECRET}` },
+      body:    JSON.stringify({ splitterAddress }),
+    });
+  } catch (err) {
+    console.error("triggerSplit failed:", err.message);
+  }
 }
 
 // ── Splitter wallet ────────────────────────────────────────────
