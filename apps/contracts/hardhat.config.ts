@@ -1,4 +1,3 @@
-import { vars } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox-viem";
 
 const DEPLOY_PRIVATE_KEY = (process.env.DEPLOY_PRIVATE_KEY ?? ("0x" + "0".repeat(64))) as `0x${string}`;
