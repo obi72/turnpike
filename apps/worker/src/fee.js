@@ -3,20 +3,36 @@
  * Single source of truth for fee calculation.
  *
  * Rules:
- *   Price $0.05+ → 15% platform fee
+ *   $0.02–$0.09 → Turnpike gets $0.01 flat
+ *   $0.10+      → Turnpike gets 10%
  *
  * All amounts in USDC units (6 decimal places).
+ * Must stay in sync with SplitterFactory.sol fee parameters.
  */
 
-const MIN_PRICE_UNITS = 50000;   // $0.05
-const PERCENT_FEE     = 0.15;
+const MIN_PRICE_UNITS = 20_000;   // $0.02
+const FLAT_FEE_UNITS  = 10_000;   // $0.01
+const THRESHOLD_UNITS = 100_000;  // $0.10
+const PERCENT_FEE     = 0.10;     // 10%
 
 export function calculateFee(priceUnits) {
   if (priceUnits < MIN_PRICE_UNITS) {
-    throw new Error(`Minimum price is $0.05 (${MIN_PRICE_UNITS} units)`);
+    throw new Error(`Minimum price is $0.02 (${MIN_PRICE_UNITS} units)`);
   }
 
-  const platformFee    = Math.round(priceUnits * PERCENT_FEE);
+  let platformFee;
+  let feeLabel;
+
+  if (priceUnits < THRESHOLD_UNITS) {
+    // $0.02–$0.09: flat $0.01 fee
+    platformFee = FLAT_FEE_UNITS;
+    feeLabel    = "$0.01";
+  } else {
+    // $0.10+: 10%
+    platformFee = Math.round(priceUnits * PERCENT_FEE);
+    feeLabel    = "10%";
+  }
+
   const providerAmount = priceUnits - platformFee;
 
   return {
@@ -26,7 +42,7 @@ export function calculateFee(priceUnits) {
       price:       formatUsdc(priceUnits),
       platformFee: formatUsdc(platformFee),
       provider:    formatUsdc(providerAmount),
-      feeLabel:    "15%",
+      feeLabel,
     },
   };
 }

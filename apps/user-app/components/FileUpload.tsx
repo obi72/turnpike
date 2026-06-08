@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { calcFee, MIN_PRICE_UNITS } from "@/lib/fee";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://api.trnpk.net";
 
@@ -18,8 +19,7 @@ export default function FileUpload({ userId, walletAddress }: Props) {
 
   const priceNum   = parseFloat(price) || 0;
   const priceUnits = Math.round(priceNum * 1_000_000);
-  const fee        = priceUnits >= 50000 ? priceNum * 0.15 : null;
-  const youGet     = fee !== null ? priceNum - fee : null;
+  const feeInfo    = calcFee(priceNum);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,7 +27,7 @@ export default function FileUpload({ userId, walletAddress }: Props) {
     if (!file) { setError("Please select a file."); return; }
     if (!walletAddress) { setError("Wallet not ready. Refresh and try again."); return; }
     if (file.size > 50 * 1024 * 1024) { setError("File too large. Maximum 50 MB."); return; }
-    if (priceUnits < 50000) { setError("Minimum price is $0.05"); return; }
+    if (priceUnits < MIN_PRICE_UNITS) { setError("Minimum price is $0.02"); return; }
 
     setUploading(true);
     setProgress(0);
@@ -117,12 +117,12 @@ export default function FileUpload({ userId, walletAddress }: Props) {
       <div>
         <label style={{ fontSize: 12, color: "var(--text-2)", display: "block", marginBottom: 6 }}>Price (USD)</label>
         <input
-          type="number" value={price} required min="0.05" step="0.01"
+          type="number" value={price} required min="0.02" step="0.01"
           onChange={e => setPrice(e.target.value)}
         />
-        {youGet !== null && (
+        {feeInfo && (
           <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4 }}>
-            You receive ${youGet.toFixed(4).replace(/\.?0+$/, "")} · 15% platform fee
+            You receive ${feeInfo.youGet.toFixed(4).replace(/\.?0+$/, "")} · {feeInfo.feeLabel} platform fee
           </p>
         )}
       </div>
@@ -150,7 +150,7 @@ export default function FileUpload({ userId, walletAddress }: Props) {
 
       {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
 
-      <button type="submit" className="btn-primary" disabled={uploading || !file || priceUnits < 50000}>
+      <button type="submit" className="btn-primary" disabled={uploading || !file || priceUnits < MIN_PRICE_UNITS}>
         {uploading ? "Uploading…" : "Upload and create pay link"}
       </button>
     </form>

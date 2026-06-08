@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { calcFee, MIN_PRICE_UNITS } from "@/lib/fee";
 import { useRouter } from "next/navigation";
 import FileUpload from "./FileUpload";
 import type { User } from "@supabase/supabase-js";
@@ -69,14 +70,13 @@ function URLForm({ userId, walletAddress }: { userId: string; walletAddress: str
   // Show computed fee alongside price input
   const priceNum   = parseFloat(price) || 0;
   const priceUnits = Math.round(priceNum * 1_000_000);
-  const fee        = priceUnits >= 50000 ? priceNum * 0.15 : null;
-  const youGet     = fee !== null ? priceNum - fee : null;
+  const feeInfo    = calcFee(priceNum);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!walletAddress) { setError("Wallet not ready. Refresh and try again."); return; }
-    if (priceUnits < 50000) { setError("Minimum price is $0.05"); return; }
+    if (priceUnits < MIN_PRICE_UNITS) { setError("Minimum price is $0.02"); return; }
 
     setLoading(true);
     try {
@@ -139,16 +139,16 @@ function URLForm({ userId, walletAddress }: { userId: string; walletAddress: str
           Price (USD)
         </label>
         <input
-          type="number" value={price} required min="0.05" step="0.01"
+          type="number" value={price} required min="0.02" step="0.01"
           onChange={e => setPrice(e.target.value)}
         />
-        {youGet !== null && (
+        {feeInfo && (
           <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4 }}>
-            You receive ${youGet.toFixed(4).replace(/\.?0+$/, "")} · 15% platform fee
+            You receive ${feeInfo.youGet.toFixed(4).replace(/\.?0+$/, "")} · {feeInfo.feeLabel} platform fee
           </p>
         )}
-        {priceUnits > 0 && priceUnits < 50000 && (
-          <p style={{ fontSize: 11, color: "var(--danger)", marginTop: 4 }}>Minimum price is $0.05</p>
+        {priceUnits > 0 && priceUnits < MIN_PRICE_UNITS && (
+          <p style={{ fontSize: 11, color: "var(--danger)", marginTop: 4 }}>Minimum price is $0.02</p>
         )}
       </div>
 
@@ -165,7 +165,7 @@ function URLForm({ userId, walletAddress }: { userId: string; walletAddress: str
 
       {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
 
-      <button type="submit" className="btn-primary" disabled={loading || priceUnits < 50000}>
+      <button type="submit" className="btn-primary" disabled={loading || priceUnits < MIN_PRICE_UNITS}>
         {loading ? "Creating…" : "Create pay link"}
       </button>
     </form>

@@ -1,17 +1,17 @@
 {
   "_format": "hh3-artifact-1",
-  "contractName": "IERC20",
+  "contractName": "IFeeCalc",
   "sourceName": "contracts/Splitter.sol",
   "abi": [
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
         }
       ],
-      "name": "balanceOf",
+      "name": "calculateFee",
       "outputs": [
         {
           "internalType": "uint256",
@@ -23,27 +23,16 @@
       "type": "function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "transfer",
+      "inputs": [],
+      "name": "platform",
       "outputs": [
         {
-          "internalType": "bool",
+          "internalType": "address",
           "name": "",
-          "type": "bool"
+          "type": "address"
         }
       ],
-      "stateMutability": "nonpayable",
+      "stateMutability": "view",
       "type": "function"
     }
   ],

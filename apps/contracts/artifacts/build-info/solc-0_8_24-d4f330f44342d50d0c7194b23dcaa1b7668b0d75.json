@@ -1,0 +1,58 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_24-d4f330f44342d50d0c7194b23dcaa1b7668b0d75",
+  "solcVersion": "0.8.24",
+  "solcLongVersion": "0.8.24+commit.e11b9ed9",
+  "compilerType": "solc",
+  "userSourceNameMap": {
+    "contracts/Splitter.sol": "project/contracts/Splitter.sol",
+    "contracts/SplitterFactory.sol": "project/contracts/SplitterFactory.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "shanghai",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": [
+        "project/:@openzeppelin/contracts/=npm/@openzeppelin/contracts@5.6.1/"
+      ]
+    },
+    "sources": {
+      "npm/@openzeppelin/contracts@5.6.1/access/Ownable.sol": {
+        "content": "// SPDX-License-Identifier: MIT\n// OpenZeppelin Contracts (last updated v5.0.0) (access/Ownable.sol)\n\npragma solidity ^0.8.20;\n\nimport {Context} from \"../utils/Context.sol\";\n\n/**\n * @dev Contract module which provides a basic access control mechanism, where\n * there is an account (an owner) that can be granted exclusive access to\n * specific functions.\n *\n * The initial owner is set to the address provided by the deployer. This can\n * later be changed with {transferOwnership}.\n *\n * This module is used through inheritance. It will make available the modifier\n * `onlyOwner`, which can be applied to your functions to restrict their use to\n * the owner.\n */\nabstract contract Ownable is Context {\n    address private _owner;\n\n    /**\n     * @dev The caller account is not authorized to perform an operation.\n     */\n    error OwnableUnauthorizedAccount(address account);\n\n    /**\n     * @dev The owner is not a valid owner account. (eg. `address(0)`)\n     */\n    error OwnableInvalidOwner(address owner);\n\n    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);\n\n    /**\n     * @dev Initializes the contract setting the address provided by the deployer as the initial owner.\n     */\n    constructor(address initialOwner) {\n        if (initialOwner == address(0)) {\n            revert OwnableInvalidOwner(address(0));\n        }\n        _transferOwnership(initialOwner);\n    }\n\n    /**\n     * @dev Throws if called by any account other than the owner.\n     */\n    modifier onlyOwner() {\n        _checkOwner();\n        _;\n    }\n\n    /**\n     * @dev Returns the address of the current owner.\n     */\n    function owner() public view virtual returns (address) {\n        return _owner;\n    }\n\n    /**\n     * @dev Throws if the sender is not the owner.\n     */\n    function _checkOwner() internal view virtual {\n        if (owner() != _msgSender()) {\n            revert OwnableUnauthorizedAccount(_msgSender());\n        }\n    }\n\n    /**\n     * @dev Leaves the contract without owner. It will not be possible to call\n     * `onlyOwner` functions. Can only be called by the current owner.\n     *\n     * NOTE: Renouncing ownership will leave the contract without an owner,\n     * thereby disabling any functionality that is only available to the owner.\n     */\n    function renounceOwnership() public virtual onlyOwner {\n        _transferOwnership(address(0));\n    }\n\n    /**\n     * @dev Transfers ownership of the contract to a new account (`newOwner`).\n     * Can only be called by the current owner.\n     */\n    function transferOwnership(address newOwner) public virtual onlyOwner {\n        if (newOwner == address(0)) {\n            revert OwnableInvalidOwner(address(0));\n        }\n        _transferOwnership(newOwner);\n    }\n\n    /**\n     * @dev Transfers ownership of the contract to a new account (`newOwner`).\n     * Internal function without access restriction.\n     */\n    function _transferOwnership(address newOwner) internal virtual {\n        address oldOwner = _owner;\n        _owner = newOwner;\n        emit OwnershipTransferred(oldOwner, newOwner);\n    }\n}\n"
+      },
+      "npm/@openzeppelin/contracts@5.6.1/utils/Context.sol": {
+        "content": "// SPDX-License-Identifier: MIT\n// OpenZeppelin Contracts (last updated v5.0.1) (utils/Context.sol)\n\npragma solidity ^0.8.20;\n\n/**\n * @dev Provides information about the current execution context, including the\n * sender of the transaction and its data. While these are generally available\n * via msg.sender and msg.data, they should not be accessed in such a direct\n * manner, since when dealing with meta-transactions the account sending and\n * paying for execution may not be the actual sender (as far as an application\n * is concerned).\n *\n * This contract is only required for intermediate, library-like contracts.\n */\nabstract contract Context {\n    function _msgSender() internal view virtual returns (address) {\n        return msg.sender;\n    }\n\n    function _msgData() internal view virtual returns (bytes calldata) {\n        return msg.data;\n    }\n\n    function _contextSuffixLength() internal view virtual returns (uint256) {\n        return 0;\n    }\n}\n"
+      },
+      "project/contracts/Splitter.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.24;\n\ninterface IERC20 {\n    function balanceOf(address account) external view returns (uint256);\n    function transfer(address to, uint256 amount) external returns (bool);\n}\n\ninterface IFeeCalc {\n    function calculateFee(uint256 amount) external view returns (uint256);\n    function platform() external view returns (address);\n}\n\n/// @title Splitter\n/// @notice Receives USDC and splits it between publisher and platform.\n///         Fee parameters are read from the Factory — always uses current rates.\n///         Anyone can call split().\ncontract Splitter {\n    address public immutable publisher;\n    address public immutable factory;\n    IERC20  public immutable usdc;\n\n    event Split(address indexed publisher, uint256 publisherAmount, uint256 platformAmount);\n\n    constructor(address _publisher, address _platform, address _usdc, address _factory) {\n        require(_publisher != address(0), \"invalid publisher\");\n        publisher = _publisher;\n        factory   = _factory;\n        usdc      = IERC20(_usdc);\n    }\n\n    /// @notice Distribute accumulated USDC using current fee parameters from factory.\n    function split() external {\n        uint256 balance = usdc.balanceOf(address(this));\n        if (balance == 0) return;\n\n        IFeeCalc calc = IFeeCalc(factory);\n        address  platform = calc.platform();\n        uint256  platformAmount  = calc.calculateFee(balance);\n        uint256  publisherAmount = balance - platformAmount;\n\n        if (platformAmount  > 0) usdc.transfer(platform,  platformAmount);\n        if (publisherAmount > 0) usdc.transfer(publisher, publisherAmount);\n\n        emit Split(publisher, publisherAmount, platformAmount);\n    }\n}\n"
+      },
+      "project/contracts/SplitterFactory.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.24;\n\nimport \"./Splitter.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\n\n/// @title SplitterFactory\n/// @notice Deploys one Splitter per publisher. Stores updatable fee parameters.\n///         Only the owner can change fee parameters — affects all future splits.\ncontract SplitterFactory is Ownable {\n    // ── Fee parameters (all amounts in USDC units, 6 decimals) ────────────────\n    // $0.01 = 10_000 | $0.02 = 20_000 | $0.10 = 100_000 | $1.00 = 1_000_000\n\n    uint256 public minAmount      = 20_000;   // $0.02 — minimum accepted payment\n    uint256 public flatFee        = 10_000;   // $0.01 — flat fee below threshold\n    uint256 public threshold      = 100_000;  // $0.10 — above this: percentage fee\n    uint256 public feeBps         = 1000;     // 10%  — in basis points (1000 = 10%)\n    uint256 public constant BPS   = 10_000;\n\n    address public immutable platform;\n    address public immutable usdc;\n\n    mapping(address => address) public splitters; // publisher → splitter\n\n    event SplitterCreated(address indexed publisher, address splitter);\n    event FeeParamsUpdated(uint256 minAmount, uint256 flatFee, uint256 threshold, uint256 feeBps);\n\n    constructor(address _platform, address _usdc) Ownable(msg.sender) {\n        platform = _platform;\n        usdc     = _usdc;\n    }\n\n    /// @notice Update fee parameters. Only callable by owner.\n    function setFeeParams(\n        uint256 _minAmount,\n        uint256 _flatFee,\n        uint256 _threshold,\n        uint256 _feeBps\n    ) external onlyOwner {\n        require(_feeBps <= BPS, \"fee > 100%\");\n        minAmount = _minAmount;\n        flatFee   = _flatFee;\n        threshold = _threshold;\n        feeBps    = _feeBps;\n        emit FeeParamsUpdated(_minAmount, _flatFee, _threshold, _feeBps);\n    }\n\n    /// @notice Calculate platform fee for a given amount using current parameters.\n    function calculateFee(uint256 amount) public view returns (uint256) {\n        if (amount < minAmount) return 0;\n        if (amount < threshold) return flatFee;\n        return amount * feeBps / BPS;\n    }\n\n    /// @notice Deploy a splitter for a publisher. Idempotent.\n    function deploy(address publisher) external returns (address) {\n        if (splitters[publisher] != address(0)) return splitters[publisher];\n        Splitter s = new Splitter(publisher, platform, usdc, address(this));\n        splitters[publisher] = address(s);\n        emit SplitterCreated(publisher, address(s));\n        return address(s);\n    }\n\n    /// @notice Trigger split on multiple splitters in one transaction.\n    function splitMany(address[] calldata splitterAddresses) external {\n        for (uint256 i = 0; i < splitterAddresses.length; i++) {\n            try Splitter(splitterAddresses[i]).split() {} catch {}\n        }\n    }\n}\n"
+      }
+    }
+  }
+}
