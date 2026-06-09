@@ -24,14 +24,16 @@ export default {
     const url  = new URL(request.url);
     const path = url.pathname;
 
-    if (path === "/api/routes"         && request.method === "POST")   return handleCreateRoute(request, env);
-    if (path === "/api/routes"         && request.method === "GET")    return handleListRoutes(request, env);
-    if (path === "/api/files/upload"   && request.method === "POST")   return handleUpload(request, env);
-    if (path === "/api/files/limit"    && request.method === "GET")    return handleLimitCheck(request, env);
-    if (path.startsWith("/api/files/") && request.method === "GET")    return handleFileMeta(request, env);
-    if (path.startsWith("/api/files/") && request.method === "DELETE") return handleDeleteFile(request, env);
-    if (path === "/api/account/close"  && request.method === "DELETE") return handleCloseAccount(request, env);
-    if (path === "/health"             && request.method === "GET")    return Response.json({ ok: true });
+    if (path === "/api/routes"              && request.method === "POST")   return handleCreateRoute(request, env);
+    if (path === "/api/routes"              && request.method === "GET")    return handleListRoutes(request, env);
+    if (path === "/api/files/upload"        && request.method === "POST")   return handleUpload(request, env);
+    if (path === "/api/files/limit"         && request.method === "GET")    return handleLimitCheck(request, env);
+    if (path.startsWith("/api/files/")      && request.method === "GET")    return handleFileMeta(request, env);
+    if (path.startsWith("/api/files/")      && request.method === "DELETE") return handleDeleteFile(request, env);
+    if (path === "/api/account/close"       && request.method === "DELETE") return handleCloseAccount(request, env);
+    if (path.startsWith("/api/meta/")       && request.method === "GET")    return handleMeta(request, env);
+    if (path.startsWith("/api/free-content/") && request.method === "POST") return handleFreeContent(request, env);
+    if (path === "/health"                  && request.method === "GET")    return Response.json({ ok: true });
 
     return handlePaywall(request, env, ctx);
   },
@@ -55,6 +57,13 @@ async function handlePaywall(request, env, ctx) {
     return new Response("This content is currently unavailable.", { status: 403 });
   }
 
+  // Browser navigation (no X-Payment header) → redirect to consumer paywall page
+  const paymentHeader = request.headers.get("X-Payment");
+  const acceptsHtml   = request.headers.get("Accept")?.includes("text/html");
+  if (!paymentHeader && acceptsHtml) {
+    return Response.redirect(`https://app.trnpk.net/pay/${slug}`, 302);
+  }
+
   // Payment requirements for x402
   const paymentRequirements = {
     scheme:             "exact",
@@ -70,7 +79,6 @@ async function handlePaywall(request, env, ctx) {
   };
 
   // Step 1: No payment yet → return 402
-  const paymentHeader = request.headers.get("X-Payment");
   if (!paymentHeader) {
     return new Response("Payment Required", {
       status: 402,
@@ -279,6 +287,75 @@ async function handleListRoutes(request, env) {
     };
   }));
   return Response.json(routes.filter(Boolean));
+}
+
+// ── Public metadata (for consumer paywall page) ───────────────
+async function handleMeta(request, env) {
+  const slug = new URL(request.url).pathname.replace("/api/meta/", "");
+  const raw  = await env.ROUTES.get(slug);
+  if (!raw) return new Response("Not found", { status: 404 });
+  const route = JSON.parse(raw);
+  if (route.suspended) return Response.json({ error: "suspended" }, { status: 403 });
+  const fee = calculateFee(parseInt(route.price));
+  return Response.json({
+    description: route.description,
+    price: route.price,
+    type: route.type,
+    fileName: route.fileName,
+    display: fee.display,
+  }, { headers: { "Access-Control-Allow-Origin": "*" } });
+}
+
+// ── Free content delivery (signed HMAC token) ─────────────────
+async function handleFreeContent(request, env) {
+  const slug = new URL(request.url).pathname.replace("/api/free-content/", "");
+  const { token, userId } = await request.json();
+  if (!token || !userId) return Response.json({ error: "token and userId required" }, { status: 400 });
+
+  // Verify HMAC token: format = "<expiry>.<sig>"
+  const dotIdx = token.indexOf(".");
+  if (dotIdx === -1) return Response.json({ error: "Invalid token" }, { status: 401 });
+  const expiry = parseInt(token.slice(0, dotIdx));
+  const sig    = token.slice(dotIdx + 1);
+
+  if (isNaN(expiry) || Date.now() > expiry) {
+    return Response.json({ error: "Token expired" }, { status: 401 });
+  }
+
+  const expectedSig = await hmacSign(env.ADMIN_SECRET, `free:${userId}:${slug}:${expiry}`);
+  if (sig !== expectedSig) return Response.json({ error: "Invalid token" }, { status: 401 });
+
+  const raw = await env.ROUTES.get(slug);
+  if (!raw) return new Response("Not found", { status: 404 });
+  const route = JSON.parse(raw);
+  if (route.suspended) return Response.json({ error: "suspended" }, { status: 403 });
+
+  if (route.type === "file") {
+    const object = await env.FILES.get(route.r2Key);
+    if (!object) return new Response("File not found", { status: 404 });
+    return new Response(object.body, {
+      headers: {
+        "Content-Type":        object.httpMetadata?.contentType ?? "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${route.fileName}"`,
+        "Content-Length":      route.fileSize.toString(),
+      },
+    });
+  }
+
+  return Response.json({ url: route.secretUrl }, {
+    headers: { "Access-Control-Allow-Origin": "*" },
+  });
+}
+
+// ── HMAC helper ────────────────────────────────────────────────
+async function hmacSign(secret, message) {
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  return btoa(String.fromCharCode(...new Uint8Array(sig)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 // ── Trigger on-chain split via backend ────────────────────────
