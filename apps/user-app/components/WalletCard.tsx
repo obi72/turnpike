@@ -17,16 +17,23 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
   const router = useRouter();
   const { setupWallet, loading: connecting, error: walletError } = usePasskeyWallet();
 
-  const [balance, setBalance]           = useState<number | null>(null);
-  const [loading, setLoading]           = useState(false);
+  const [balance, setBalance]             = useState<number | null>(null);
+  const [loading, setLoading]             = useState(false);
   const [onrampLoading, setOnrampLoading] = useState(false);
-  const [onrampError, setOnrampError]   = useState<string | null>(null);
+  const [onrampError, setOnrampError]     = useState<string | null>(null);
   const [offrampLoading, setOfframpLoading] = useState(false);
-  const [offrampError, setOfframpError] = useState<string | null>(null);
+  const [offrampError, setOfframpError]   = useState<string | null>(null);
+  const [transakUrl, setTransakUrl]       = useState<string | null>(null);
+  const [transakTitle, setTransakTitle]   = useState<string>("");
 
   useEffect(() => {
     if (walletAddress) loadBalance();
   }, [walletAddress]);
+
+  // Reload balance when modal closes
+  useEffect(() => {
+    if (!transakUrl && walletAddress) loadBalance();
+  }, [transakUrl]);
 
   async function loadBalance() {
     if (!walletAddress) return;
@@ -57,7 +64,8 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
     setOnrampLoading(true); setOnrampError(null);
     try {
       const { url } = await api.transakOnrampSession(walletAddress, userEmail);
-      window.open(url, "_blank", "width=500,height=700,noopener");
+      setTransakTitle("Add Funds");
+      setTransakUrl(url);
     } catch {
       setOnrampError("Could not open payment. Please try again.");
     } finally {
@@ -71,7 +79,8 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
     setOfframpLoading(true); setOfframpError(null);
     try {
       const { url } = await api.transakOfframpSession(walletAddress, balance!, userEmail);
-      window.open(url, "_blank", "width=500,height=700,noopener");
+      setTransakTitle("Withdraw");
+      setTransakUrl(url);
     } catch {
       setOfframpError("Could not open withdrawal. Please try again.");
     } finally {
@@ -101,37 +110,85 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
 
   // ── Account active ─────────────────────────────────────────────────────────
   return (
-    <div style={{
-      background: "var(--bg-2)", border: "1px solid var(--border)",
-      borderRadius: "var(--radius)", padding: 20, marginBottom: 16, textAlign: "center",
-    }}>
-      <p style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-        Balance
-      </p>
-      <p style={{ fontSize: 42, fontWeight: 600, marginBottom: 4 }}>
-        {loading ? "…" : balance !== null ? `$${balance.toFixed(2)}` : "—"}
-        <button onClick={loadBalance} disabled={loading}
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-3)", marginLeft: 8, verticalAlign: "middle", padding: 0, lineHeight: 1 }}
-          title="Refresh">↻</button>
-      </p>
-      <p style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 16 }}>
-        {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
-      </p>
+    <>
+      <div style={{
+        background: "var(--bg-2)", border: "1px solid var(--border)",
+        borderRadius: "var(--radius)", padding: 20, marginBottom: 16, textAlign: "center",
+      }}>
+        <p style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          Balance
+        </p>
+        <p style={{ fontSize: 42, fontWeight: 600, marginBottom: 4 }}>
+          {loading ? "…" : balance !== null ? `$${balance.toFixed(2)}` : "—"}
+          <button onClick={loadBalance} disabled={loading}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-3)", marginLeft: 8, verticalAlign: "middle", padding: 0, lineHeight: 1 }}
+            title="Refresh">↻</button>
+        </p>
+        <p style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 16 }}>
+          {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
+        </p>
 
-      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-        <button className="btn-primary" style={{ fontSize: 13 }}
-          onClick={handleAddFunds} disabled={onrampLoading}>
-          {onrampLoading ? "Opening…" : "+ Add funds"}
-        </button>
-        <button className="btn-ghost" style={{ fontSize: 13 }}
-          onClick={handleWithdraw} disabled={offrampLoading || (balance ?? 0) < 10}
-          title={(balance ?? 0) < 10 ? "Minimum withdrawal is $10.00" : undefined}>
-          {offrampLoading ? "…" : "Withdraw"}
-        </button>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+          <button className="btn-primary" style={{ fontSize: 13 }}
+            onClick={handleAddFunds} disabled={onrampLoading}>
+            {onrampLoading ? "Opening…" : "+ Add funds"}
+          </button>
+          <button className="btn-ghost" style={{ fontSize: 13 }}
+            onClick={handleWithdraw} disabled={offrampLoading || (balance ?? 0) < 10}
+            title={(balance ?? 0) < 10 ? "Minimum withdrawal is $10.00" : undefined}>
+            {offrampLoading ? "…" : "Withdraw"}
+          </button>
+        </div>
+
+        {onrampError  && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{onrampError}</p>}
+        {offrampError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{offrampError}</p>}
       </div>
 
-      {onrampError  && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{onrampError}</p>}
-      {offrampError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{offrampError}</p>}
-    </div>
+      {/* Transak iFrame Modal */}
+      {transakUrl && (
+        <div
+          onClick={() => setTransakUrl(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "var(--bg-1)", borderRadius: "var(--radius)",
+              overflow: "hidden", width: "100%", maxWidth: 480,
+              boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
+              display: "flex", flexDirection: "column",
+            }}
+          >
+            {/* Modal header */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "14px 16px", borderBottom: "1px solid var(--border)",
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{transakTitle}</span>
+              <button
+                onClick={() => setTransakUrl(null)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  fontSize: 20, color: "var(--text-3)", lineHeight: 1, padding: 0,
+                }}
+                title="Close"
+              >×</button>
+            </div>
+
+            {/* iFrame */}
+            <iframe
+              src={transakUrl}
+              style={{ width: "100%", height: 620, border: "none", display: "block" }}
+              allow="camera; microphone; payment"
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
