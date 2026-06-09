@@ -9,28 +9,33 @@ const ANON_KEY      = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const WORKER_URL    = process.env.NEXT_PUBLIC_WORKER_URL!;
 const BACKEND_URL   = process.env.NEXT_PUBLIC_BACKEND_URL!;
 
+const USDC_ON_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
 type Meta = {
-  description: string;
-  price: string;
-  type: "url" | "file";
-  fileName?: string;
+  description:     string;
+  price:           string;
+  type:            "url" | "file";
+  fileName?:       string;
+  splitterAddress: string;
   display: { price: string; provider: string; feeLabel: string };
 };
 
 type Step =
   | "loading"
-  | "show"       // show content info + CTA
-  | "login"      // email input
-  | "otp"        // OTP input
-  | "wallet"     // WebAuthn setup
-  | "getting"    // fetching content
-  | "done"       // URL content delivered
+  | "show"        // show content info + CTA
+  | "login"       // email input
+  | "otp"         // OTP input
+  | "wallet"      // WebAuthn setup
+  | "getting"     // fetching free content
+  | "paying"      // signing + sending payment
+  | "add-funds"   // Transak modal
+  | "done"        // content delivered
   | "error";
 
 export default function PayPage({ params }: { params: Promise<{ slug: string }> }) {
   const [slug, setSlug] = useState<string | null>(null);
   const supabase  = createBrowserClient(SUPABASE_URL, ANON_KEY);
-  const { setupWallet, loading: walletBusy, error: walletErr } = usePasskeyWallet();
+  const { setupWallet, signPayment, startSession, hasSession, loading: walletBusy, error: walletErr } = usePasskeyWallet();
 
   const [meta, setMeta]               = useState<Meta | null>(null);
   const [step, setStep]               = useState<Step>("loading");
@@ -41,6 +46,9 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
   const [userEmail, setUserEmail]     = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [contentUrl, setContentUrl]   = useState<string | null>(null);
+  const [credentialId, setCredentialId] = useState<string | null>(null);
+  const [balance, setBalance]         = useState<number | null>(null);
+  const [transakUrl, setTransakUrl]   = useState<string | null>(null);
   const [err, setErr]                 = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,8 +78,11 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
           .select("wallet_address, first_access_used")
           .eq("id", session.user.id)
           .single();
-        if (profile?.wallet_address) setWalletAddress(profile.wallet_address);
-        // Sync localStorage if DB already used
+        if (profile?.wallet_address) {
+          setWalletAddress(profile.wallet_address);
+          setCredentialId(profile.passkey_credential_id ?? null);
+          await loadBalance(profile.wallet_address);
+        }
         if (profile?.first_access_used) localStorage.setItem("trnpk_welcomed", "1");
       }
 
@@ -79,6 +90,84 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
       setStep("show");
     } catch {
       setErr("Could not load content."); setStep("error");
+    }
+  }
+
+  async function loadBalance(addr: string) {
+    try {
+      const res  = await fetch(`https://api.basescan.org/api?module=account&action=tokenbalance&contractaddress=${USDC_ON_BASE}&address=${addr}&tag=latest`);
+      const data = await res.json();
+      const raw  = Number(data.result);
+      setBalance(isNaN(raw) ? 0 : raw / 1e6);
+    } catch { setBalance(0); }
+  }
+
+  // ── Paid access flow ──────────────────────────────────────────
+  async function startPaidFlow() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setStep("login"); return; }
+    if (!walletAddress) { setStep("wallet"); return; }
+    await executePaidPayment(session.access_token);
+  }
+
+  async function executePaidPayment(accessToken: string) {
+    if (!meta || !walletAddress || !credentialId || !slug) return;
+    setStep("paying"); setErr(null);
+
+    const price = parseInt(meta.price);
+
+    // Check balance
+    await loadBalance(walletAddress);
+    if ((balance ?? 0) < price / 1e6) {
+      // Need to top up first
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/transak/onramp-session`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
+          body: JSON.stringify({ walletAddress, email: userEmail }),
+        });
+        if (res.ok) {
+          const { url } = await res.json();
+          setTransakUrl(url);
+        }
+      } catch {}
+      setStep("add-funds");
+      return;
+    }
+
+    // Sign payment
+    const paymentHeader = await signPayment({
+      splitterAddress: meta.splitterAddress,
+      price,
+      credentialId,
+    });
+    if (!paymentHeader) { setStep("show"); return; }
+
+    // Fetch content with X-Payment header
+    try {
+      const res = await fetch(`${WORKER_URL}/${slug}`, {
+        headers: { "X-Payment": paymentHeader, "Accept": "application/json" },
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "Payment failed.");
+        throw new Error(text);
+      }
+
+      if (meta.type === "file") {
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href = url; a.download = meta.fileName ?? "download"; a.click();
+        URL.revokeObjectURL(url);
+        setStep("done");
+      } else {
+        const { url } = await res.json();
+        setContentUrl(url);
+        setStep("done");
+      }
+    } catch (e: any) {
+      setErr(e.message); setStep("show");
     }
   }
 
@@ -109,10 +198,16 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
       body: JSON.stringify({ userId: u.id, email: u.email }),
     }).catch(() => {});
     // Check wallet
-    const { data: profile } = await supabase.from("users").select("wallet_address").eq("id", u.id).single();
+    const { data: profile } = await supabase.from("users").select("wallet_address, passkey_credential_id").eq("id", u.id).single();
     if (profile?.wallet_address) {
       setWalletAddress(profile.wallet_address);
-      await claimFree(data.session.access_token);
+      setCredentialId(profile.passkey_credential_id ?? null);
+      await loadBalance(profile.wallet_address);
+      if (freeEligible) {
+        await claimFree(data.session!.access_token);
+      } else {
+        await executePaidPayment(data.session!.access_token);
+      }
     } else {
       setStep("wallet");
     }
@@ -135,7 +230,11 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
     }).catch(() => {});
     setWalletAddress(result.address);
     const { data: { session } } = await supabase.auth.getSession();
-    await claimFree(session!.access_token);
+    if (freeEligible) {
+      await claimFree(session!.access_token);
+    } else {
+      await executePaidPayment(session!.access_token);
+    }
   }
 
   async function claimFree(accessToken: string) {
@@ -216,6 +315,42 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
 
   if (step === "getting") return (
     <div style={card}><p style={{ color: "var(--text-2)" }}>Unlocking content…</p></div>
+  );
+
+  if (step === "paying") return (
+    <div style={card}><p style={{ color: "var(--text-2)" }}>Processing payment…</p></div>
+  );
+
+  if (step === "add-funds") return (
+    <>
+      <div style={card}>
+        <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Add funds to continue</p>
+        <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 20, lineHeight: 1.5 }}>
+          Your balance is too low to pay {meta?.display.price}. Add funds with your credit card.
+        </p>
+        <button className="btn-primary" style={{ width: "100%" }}
+          onClick={() => transakUrl && setStep("add-funds")}>
+          + Add funds
+        </button>
+        <button className="btn-ghost" style={{ width: "100%", marginTop: 8 }}
+          onClick={() => setStep("show")}>Cancel</button>
+      </div>
+      {transakUrl && (
+        <div onClick={() => { setTransakUrl(null); setStep("show"); }}
+          style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: "var(--bg-1)", borderRadius: "var(--radius)", overflow: "hidden", width: "100%", maxWidth: 480, boxShadow: "0 24px 64px rgba(0,0,0,0.4)", display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Add Funds</span>
+              <button onClick={() => { setTransakUrl(null); setStep("show"); }}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-3)", lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+            <iframe src={transakUrl} style={{ width: "100%", height: 620, border: "none", display: "block" }}
+              allow="camera; microphone; payment" />
+          </div>
+        </div>
+      )}
+    </>
   );
 
   if (step === "login") return (
@@ -314,9 +449,11 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
           Get free access
         </button>
       ) : (
-        <p style={{ fontSize: 13, color: "var(--text-2)" }}>
-          Paid access — coming soon.
-        </p>
+        <button className="btn-primary" style={{ width: "100%" }} onClick={startPaidFlow}>
+          {walletAddress && hasSession(walletAddress)
+            ? `Pay ${meta?.display.price}`
+            : `Pay ${meta?.display.price} with PIN`}
+        </button>
       )}
     </div>
   );

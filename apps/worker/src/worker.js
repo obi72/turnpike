@@ -32,6 +32,7 @@ export default {
     if (path.startsWith("/api/files/")      && request.method === "DELETE") return handleDeleteFile(request, env);
     if (path === "/api/account/close"       && request.method === "DELETE") return handleCloseAccount(request, env);
     if (path.startsWith("/api/meta/")       && request.method === "GET")    return handleMeta(request, env);
+    if (request.method === "OPTIONS") return handleCors();
     if (path.startsWith("/api/free-content/") && request.method === "POST") return handleFreeContent(request, env);
     if (path === "/health"                  && request.method === "GET")    return Response.json({ ok: true });
 
@@ -85,7 +86,7 @@ async function handlePaywall(request, env, ctx) {
       headers: {
         "X-Payment-Required": JSON.stringify(paymentRequirements),
         "Content-Type":       "application/json",
-        "Access-Control-Expose-Headers": "X-Payment-Required",
+        ...corsHeaders(),
       },
     });
   }
@@ -127,6 +128,11 @@ async function handlePaywall(request, env, ctx) {
     });
   }
 
+  // Programmatic access (fetch from frontend) → return JSON instead of redirect
+  const acceptsHtml2 = request.headers.get("Accept")?.includes("text/html");
+  if (!acceptsHtml2) {
+    return Response.json({ url: route.secretUrl }, { headers: corsHeaders() });
+  }
   return Response.redirect(route.secretUrl, 302);
 }
 
@@ -298,12 +304,13 @@ async function handleMeta(request, env) {
   if (route.suspended) return Response.json({ error: "suspended" }, { status: 403 });
   const fee = calculateFee(parseInt(route.price));
   return Response.json({
-    description: route.description,
-    price: route.price,
-    type: route.type,
-    fileName: route.fileName,
-    display: fee.display,
-  }, { headers: { "Access-Control-Allow-Origin": "*" } });
+    description:      route.description,
+    price:            route.price,
+    type:             route.type,
+    fileName:         route.fileName,
+    splitterAddress:  route.splitterAddress,
+    display:          fee.display,
+  }, { headers: corsHeaders() });
 }
 
 // ── Free content delivery (signed HMAC token) ─────────────────
@@ -345,6 +352,20 @@ async function handleFreeContent(request, env) {
   return Response.json({ url: route.secretUrl }, {
     headers: { "Access-Control-Allow-Origin": "*" },
   });
+}
+
+// ── CORS helpers ───────────────────────────────────────────────
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin":  "https://app.trnpk.net",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Payment, Authorization",
+    "Access-Control-Expose-Headers": "X-Payment-Required",
+  };
+}
+
+function handleCors() {
+  return new Response(null, { status: 204, headers: corsHeaders() });
 }
 
 // ── HMAC helper ────────────────────────────────────────────────
