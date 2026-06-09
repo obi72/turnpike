@@ -27,8 +27,8 @@ type Step =
   | "done"       // URL content delivered
   | "error";
 
-export default function PayPage({ params }: { params: { slug: string } }) {
-  const { slug } = params;
+export default function PayPage({ params }: { params: Promise<{ slug: string }> }) {
+  const [slug, setSlug] = useState<string | null>(null);
   const supabase  = createBrowserClient(SUPABASE_URL, ANON_KEY);
   const { setupWallet, loading: walletBusy, error: walletErr } = usePasskeyWallet();
 
@@ -43,7 +43,11 @@ export default function PayPage({ params }: { params: { slug: string } }) {
   const [contentUrl, setContentUrl]   = useState<string | null>(null);
   const [err, setErr]                 = useState<string | null>(null);
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => {
+    params.then(p => setSlug(p.slug));
+  }, []);
+
+  useEffect(() => { if (slug) init(); }, [slug]);
 
   async function init() {
     try {
@@ -188,7 +192,7 @@ export default function PayPage({ params }: { params: { slug: string } }) {
     letterSpacing: "0.08em", marginBottom: 6,
   };
 
-  if (step === "loading") return (
+  if (!slug || step === "loading") return (
     <div style={card}><p style={{ color: "var(--text-2)" }}>Loading…</p></div>
   );
 
