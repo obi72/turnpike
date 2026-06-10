@@ -75,7 +75,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         setUserEmail(session.user.email ?? null);
         const { data: profile } = await supabase
           .from("users")
-          .select("wallet_address, first_access_used")
+          .select("wallet_address, passkey_credential_id, first_access_used")
           .eq("id", session.user.id)
           .single();
         if (profile?.wallet_address) {

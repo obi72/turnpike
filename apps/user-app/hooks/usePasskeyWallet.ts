@@ -221,7 +221,7 @@ export function usePasskeyWallet() {
           from:        account.address,
           to:          splitterAddress as `0x${string}`,
           value:       BigInt(price),
-          validAfter:  0n,
+          validAfter:  BigInt(0),
           validBefore,
           nonce,
         },
