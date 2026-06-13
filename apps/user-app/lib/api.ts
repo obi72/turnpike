@@ -44,6 +44,13 @@ export const api = {
   transakOfframpSession: (walletAddress: string, amount: number, email?: string) =>
     apiFetch("/transak/offramp-session", { method: "POST", body: JSON.stringify({ walletAddress, amount, email }) }),
 
+  // Provider-agnostic — routes to Transak or Mercuryo depending on ONRAMP_PROVIDER
+  onrampSession: (walletAddress: string, email?: string, amount?: number) =>
+    apiFetch("/onramp/onramp-session", { method: "POST", body: JSON.stringify({ walletAddress, email, amount }) }),
+
+  offrampSession: (walletAddress: string, amount: number, email?: string) =>
+    apiFetch("/onramp/offramp-session", { method: "POST", body: JSON.stringify({ walletAddress, amount, email }) }),
+
   crossmintOrder: (walletAddress: string, email: string, amount?: number) =>
     apiFetch("/crossmint/order", { method: "POST", body: JSON.stringify({ walletAddress, email, amount }) }),
 };

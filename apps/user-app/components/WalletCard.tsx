@@ -23,8 +23,8 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
   const [onrampError, setOnrampError]     = useState<string | null>(null);
   const [offrampLoading, setOfframpLoading] = useState(false);
   const [offrampError, setOfframpError]   = useState<string | null>(null);
-  const [transakUrl, setTransakUrl]       = useState<string | null>(null);
-  const [transakTitle, setTransakTitle]   = useState<string>("");
+  const [widgetUrl, setWidgetUrl]   = useState<string | null>(null);
+  const [widgetTitle, setWidgetTitle] = useState<string>("");
 
   useEffect(() => {
     if (walletAddress) loadBalance();
@@ -32,8 +32,8 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
 
   // Reload balance when modal closes
   useEffect(() => {
-    if (!transakUrl && walletAddress) loadBalance();
-  }, [transakUrl]);
+    if (!widgetUrl && walletAddress) loadBalance();
+  }, [widgetUrl]);
 
   async function loadBalance() {
     if (!walletAddress) return;
@@ -63,9 +63,9 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
     if (!walletAddress) return;
     setOnrampLoading(true); setOnrampError(null);
     try {
-      const { url } = await api.transakOnrampSession(walletAddress, userEmail);
-      setTransakTitle("Add Funds");
-      setTransakUrl(url);
+      const { url } = await api.onrampSession(walletAddress, userEmail);
+      setWidgetTitle("Add Funds");
+      setWidgetUrl(url);
     } catch {
       setOnrampError("Could not open payment. Please try again.");
     } finally {
@@ -78,9 +78,9 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
     if ((balance ?? 0) < 10) { setOfframpError("Minimum withdrawal is $10.00"); return; }
     setOfframpLoading(true); setOfframpError(null);
     try {
-      const { url } = await api.transakOfframpSession(walletAddress, balance!, userEmail);
-      setTransakTitle("Withdraw");
-      setTransakUrl(url);
+      const { url } = await api.offrampSession(walletAddress, balance!, userEmail);
+      setWidgetTitle("Withdraw");
+      setWidgetUrl(url);
     } catch {
       setOfframpError("Could not open withdrawal. Please try again.");
     } finally {
@@ -144,10 +144,10 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
         {offrampError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{offrampError}</p>}
       </div>
 
-      {/* Transak iFrame Modal */}
-      {transakUrl && (
+      {/* Onramp/Offramp iFrame Modal */}
+      {widgetUrl && (
         <div
-          onClick={() => setTransakUrl(null)}
+          onClick={() => setWidgetUrl(null)}
           style={{
             position: "fixed", inset: 0, zIndex: 1000,
             background: "rgba(0,0,0,0.7)",
@@ -164,14 +164,13 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
               display: "flex", flexDirection: "column",
             }}
           >
-            {/* Modal header */}
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "14px 16px", borderBottom: "1px solid var(--border)",
             }}>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{transakTitle}</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{widgetTitle}</span>
               <button
-                onClick={() => setTransakUrl(null)}
+                onClick={() => setWidgetUrl(null)}
                 style={{
                   background: "none", border: "none", cursor: "pointer",
                   fontSize: 20, color: "var(--text-3)", lineHeight: 1, padding: 0,
@@ -179,10 +178,8 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
                 title="Close"
               >×</button>
             </div>
-
-            {/* iFrame */}
             <iframe
-              src={transakUrl}
+              src={widgetUrl}
               style={{ width: "100%", height: 620, border: "none", display: "block" }}
               allow="camera; microphone; payment"
             />

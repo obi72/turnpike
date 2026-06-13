@@ -22,10 +22,10 @@ type Meta = {
 
 type Step =
   | "loading"
-  | "show"        // show content info + CTA
-  | "login"       // email input
-  | "otp"         // OTP input
-  | "wallet"      // WebAuthn setup
+  | "show"         // show content info + CTA
+  | "login"        // email input
+  | "check-email"  // magic link sent, waiting for click
+  | "wallet"       // WebAuthn setup
   | "getting"     // fetching free content
   | "paying"      // signing + sending payment
   | "add-funds"   // Transak modal
@@ -41,14 +41,13 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
   const [step, setStep]               = useState<Step>("loading");
   const [freeEligible, setFreeEligible] = useState(false);
   const [email, setEmail]             = useState("");
-  const [otp, setOtp]                 = useState("");
   const [userId, setUserId]           = useState<string | null>(null);
   const [userEmail, setUserEmail]     = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [contentUrl, setContentUrl]   = useState<string | null>(null);
   const [credentialId, setCredentialId] = useState<string | null>(null);
   const [balance, setBalance]         = useState<number | null>(null);
-  const [transakUrl, setTransakUrl]   = useState<string | null>(null);
+  const [widgetUrl, setWidgetUrl]     = useState<string | null>(null);
   const [err, setErr]                 = useState<string | null>(null);
 
   useEffect(() => {
@@ -121,14 +120,14 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
     if ((balance ?? 0) < price / 1e6) {
       // Need to top up first
       try {
-        const res = await fetch(`${BACKEND_URL}/api/transak/onramp-session`, {
+        const res = await fetch(`${BACKEND_URL}/api/onramp/onramp-session`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
           body: JSON.stringify({ walletAddress, email: userEmail }),
         });
         if (res.ok) {
           const { url } = await res.json();
-          setTransakUrl(url);
+          setWidgetUrl(url);
         }
       } catch {}
       setStep("add-funds");
@@ -181,36 +180,15 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
 
   async function handleLogin() {
     setErr(null);
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/pay/${slug}`,
+      },
+    });
     if (error) { setErr(error.message); return; }
-    setStep("otp");
-  }
-
-  async function handleOtp() {
-    setErr(null);
-    const { data, error } = await supabase.auth.verifyOtp({ email, token: otp, type: "email" });
-    if (error || !data.session) { setErr(error?.message ?? "Verification failed."); return; }
-    const u = data.session.user;
-    setUserId(u.id); setUserEmail(u.email ?? null);
-    // Sync user to backend
-    await fetch(`${BACKEND_URL}/api/users/sync`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: u.id, email: u.email }),
-    }).catch(() => {});
-    // Check wallet
-    const { data: profile } = await supabase.from("users").select("wallet_address, passkey_credential_id").eq("id", u.id).single();
-    if (profile?.wallet_address) {
-      setWalletAddress(profile.wallet_address);
-      setCredentialId(profile.passkey_credential_id ?? null);
-      await loadBalance(profile.wallet_address);
-      if (freeEligible) {
-        await claimFree(data.session!.access_token);
-      } else {
-        await executePaidPayment(data.session!.access_token);
-      }
-    } else {
-      setStep("wallet");
-    }
+    setStep("check-email");
   }
 
   async function handleGoogleLogin() {
@@ -329,23 +307,23 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
           Your balance is too low to pay {meta?.display.price}. Add funds with your credit card.
         </p>
         <button className="btn-primary" style={{ width: "100%" }}
-          onClick={() => transakUrl && setStep("add-funds")}>
+          onClick={() => widgetUrl && setStep("add-funds")}>
           + Add funds
         </button>
         <button className="btn-ghost" style={{ width: "100%", marginTop: 8 }}
           onClick={() => setStep("show")}>Cancel</button>
       </div>
-      {transakUrl && (
-        <div onClick={() => { setTransakUrl(null); setStep("show"); }}
+      {widgetUrl && (
+        <div onClick={() => { setWidgetUrl(null); setStep("show"); }}
           style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={e => e.stopPropagation()}
             style={{ background: "var(--bg-1)", borderRadius: "var(--radius)", overflow: "hidden", width: "100%", maxWidth: 480, boxShadow: "0 24px 64px rgba(0,0,0,0.4)", display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>Add Funds</span>
-              <button onClick={() => { setTransakUrl(null); setStep("show"); }}
+              <button onClick={() => { setWidgetUrl(null); setStep("show"); }}
                 style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-3)", lineHeight: 1, padding: 0 }}>×</button>
             </div>
-            <iframe src={transakUrl} style={{ width: "100%", height: 620, border: "none", display: "block" }}
+            <iframe src={widgetUrl} style={{ width: "100%", height: 620, border: "none", display: "block" }}
               allow="camera; microphone; payment" />
           </div>
         </div>
@@ -364,7 +342,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         style={{ width: "100%", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--bg-1)", color: "var(--text-1)", fontSize: 14, boxSizing: "border-box", marginBottom: 10 }}
       />
       {err && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{err}</p>}
-      <button className="btn-primary" style={{ width: "100%" }} onClick={handleLogin}>Send code</button>
+      <button className="btn-primary" style={{ width: "100%" }} onClick={handleLogin}>Send link</button>
       <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
         <span style={{ fontSize: 12, color: "var(--text-3)" }}>or</span>
@@ -376,21 +354,17 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
     </div>
   );
 
-  if (step === "otp") return (
+  if (step === "check-email") return (
     <div style={card}>
       <p style={{ ...label }}>Step 1 of 2</p>
-      <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Check your email</p>
-      <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>
-        Enter the 6-digit code we sent to <strong>{email}</strong>
+      <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Check your inbox</p>
+      <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 20, lineHeight: 1.5 }}>
+        We sent a sign-in link to <strong>{email}</strong>. Click it to continue.
       </p>
-      <input
-        type="text" inputMode="numeric" value={otp} onChange={e => setOtp(e.target.value)}
-        placeholder="123456" maxLength={6}
-        onKeyDown={e => e.key === "Enter" && handleOtp()}
-        style={{ width: "100%", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--bg-1)", color: "var(--text-1)", fontSize: 20, letterSpacing: "0.2em", textAlign: "center", boxSizing: "border-box", marginBottom: 10 }}
-      />
-      {err && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{err}</p>}
-      <button className="btn-primary" style={{ width: "100%" }} onClick={handleOtp}>Verify</button>
+      <button className="btn-ghost" style={{ width: "100%", fontSize: 13 }}
+        onClick={() => { setStep("login"); setErr(null); }}>
+        ← Different email
+      </button>
     </div>
   );
 
