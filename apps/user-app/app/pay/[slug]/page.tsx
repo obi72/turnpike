@@ -40,6 +40,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
   const [meta, setMeta]               = useState<Meta | null>(null);
   const [step, setStep]               = useState<Step>("loading");
   const [freeEligible, setFreeEligible] = useState(false);
+  const [alreadyPurchased, setAlreadyPurchased] = useState(false);
   const [email, setEmail]             = useState("");
   const [userId, setUserId]           = useState<string | null>(null);
   const [userEmail, setUserEmail]     = useState<string | null>(null);
@@ -48,6 +49,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
   const [credentialId, setCredentialId] = useState<string | null>(null);
   const [balance, setBalance]         = useState<number | null>(null);
   const [widgetUrl, setWidgetUrl]     = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [err, setErr]                 = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
       if (session?.user) {
         setUserId(session.user.id);
         setUserEmail(session.user.email ?? null);
+        setAccessToken(session.access_token);
         const { data: profile } = await supabase
           .from("users")
           .select("wallet_address, passkey_credential_id, first_access_used")
@@ -83,6 +86,13 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
           await loadBalance(profile.wallet_address);
         }
         if (profile?.first_access_used) localStorage.setItem("trnpk_welcomed", "1");
+
+        // Check if user has already paid for this slug
+        const { purchased } = await fetch(
+          `${BACKEND_URL}/api/purchases/check?slug=${encodeURIComponent(p.slug)}`,
+          { headers: { Authorization: `Bearer ${session.access_token}` } }
+        ).then(r => r.json()).catch(() => ({ purchased: false }));
+        setAlreadyPurchased(purchased);
       }
 
       setFreeEligible(priceOk && !localUsed);
@@ -162,6 +172,51 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         setStep("done");
       } else {
         const { url } = await res.json();
+        setContentUrl(url);
+        setStep("done");
+      }
+
+      // Record purchase so user can access for free next time
+      if (accessToken && slug) {
+        await fetch(`${BACKEND_URL}/api/purchases`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ slug }),
+        }).catch(() => {});
+        setAlreadyPurchased(true);
+      }
+    } catch (e: any) {
+      setErr(e.message); setStep("show");
+    }
+  }
+
+  // ── Replay already-purchased content ─────────────────────────
+  async function replayAndDeliver() {
+    if (!accessToken || !slug || !meta) return;
+    setStep("getting"); setErr(null);
+    try {
+      const { token, userId: uid } = await fetch(`${BACKEND_URL}/api/replay-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ slug }),
+      }).then(r => r.json());
+
+      const contentRes = await fetch(`${WORKER_URL}/api/free-content/${slug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, userId: uid }),
+      });
+      if (!contentRes.ok) throw new Error("Could not retrieve content.");
+
+      if (meta.type === "file") {
+        const blob = await contentRes.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href = url; a.download = meta.fileName ?? "download"; a.click();
+        URL.revokeObjectURL(url);
+        setStep("done");
+      } else {
+        const { url } = await contentRes.json();
         setContentUrl(url);
         setStep("done");
       }
@@ -418,7 +473,11 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
 
       {err && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 12 }}>{err}</p>}
 
-      {freeEligible ? (
+      {alreadyPurchased ? (
+        <button className="btn-primary" style={{ width: "100%" }} onClick={replayAndDeliver}>
+          Access content
+        </button>
+      ) : freeEligible ? (
         <button className="btn-primary" style={{ width: "100%" }} onClick={startFreeFlow}>
           Get free access
         </button>

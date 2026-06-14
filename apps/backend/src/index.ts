@@ -8,6 +8,7 @@ import usersRouter     from "./routes/users.js";
 import crossmintRouter from "./routes/crossmint.js";
 import splitRouter      from "./routes/split.js";
 import freeAccessRouter from "./routes/freeAccess.js";
+import purchasesRouter  from "./routes/purchases.js";
 
 const app  = express();
 const port = parseInt(process.env.PORT ?? "3001");
@@ -30,5 +31,6 @@ app.use("/api", usersRouter);
 app.use("/api", crossmintRouter);
 app.use("/api", splitRouter);
 app.use("/api", freeAccessRouter);
+app.use("/api", purchasesRouter);
 
 app.listen(port, () => console.log(`Backend running on :${port}`));

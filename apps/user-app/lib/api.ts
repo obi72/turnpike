@@ -53,4 +53,23 @@ export const api = {
 
   crossmintOrder: (walletAddress: string, email: string, amount?: number) =>
     apiFetch("/crossmint/order", { method: "POST", body: JSON.stringify({ walletAddress, email, amount }) }),
+
+  checkPurchase: (slug: string, accessToken: string) =>
+    apiFetch(`/purchases/check?slug=${encodeURIComponent(slug)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }),
+
+  recordPurchase: (slug: string, accessToken: string) =>
+    apiFetch("/purchases", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ slug }),
+    }),
+
+  replayAccess: (slug: string, accessToken: string) =>
+    apiFetch("/replay-access", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ slug }),
+    }),
 };
