@@ -65,9 +65,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
       const m: Meta = await res.json();
       setMeta(m);
 
-      const price      = parseInt(m.price);
       const localUsed  = localStorage.getItem("trnpk_welcomed") === "1";
-      const priceOk    = price <= 990_000; // ≤ $0.99
 
       // Check Supabase session
       const { data: { session } } = await supabase.auth.getSession();
@@ -77,7 +75,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         setAccessToken(session.access_token);
         const { data: profile } = await supabase
           .from("users")
-          .select("wallet_address, passkey_credential_id, first_access_used")
+          .select("wallet_address, passkey_credential_id, free_access_count")
           .eq("id", session.user.id)
           .single();
         if (profile?.wallet_address) {
@@ -85,7 +83,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
           setCredentialId(profile.passkey_credential_id ?? null);
           await loadBalance(profile.wallet_address);
         }
-        if (profile?.first_access_used) localStorage.setItem("trnpk_welcomed", "1");
+        if ((profile?.free_access_count ?? 0) >= 3) localStorage.setItem("trnpk_welcomed", "1");
 
         // Check if user has already paid for this slug
         const { purchased } = await fetch(
@@ -95,7 +93,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         setAlreadyPurchased(purchased);
       }
 
-      setFreeEligible(priceOk && !localUsed);
+      setFreeEligible(!localUsed);
       setStep("show");
     } catch {
       setErr("Could not load content."); setStep("error");

@@ -33,27 +33,29 @@ router.post("/free-access", async (req, res) => {
   const { slug } = req.body;
   if (!slug) return res.status(400).json({ error: "slug required" });
 
-  // Fetch content metadata from worker to check price
-  const metaRes = await fetch(`${process.env.WORKER_URL}/api/meta/${slug}`).catch(() => null);
-  if (!metaRes?.ok) return res.status(404).json({ error: "Content not found" });
-  const meta = await metaRes.json();
+  // Read current free access count
+  const { data: userData } = await supabaseAdmin
+    .from("users")
+    .select("free_access_count")
+    .eq("id", user.id)
+    .single();
 
-  // Price check: ≤ $0.99 = 990_000 USDC units
-  if (parseInt(meta.price) > 990_000) {
-    return res.status(403).json({ error: "Price exceeds free access limit ($0.99)" });
+  const currentCount = userData?.free_access_count ?? 0;
+  if (currentCount >= 3) {
+    return res.status(403).json({ error: "Free access limit reached (3 of 3 used)" });
   }
 
-  // Atomically mark first_access_used = true (only if still false)
+  // Atomically increment — only succeeds if count hasn't changed (optimistic lock)
   const { data: updated } = await supabaseAdmin
     .from("users")
-    .update({ first_access_used: true })
+    .update({ free_access_count: currentCount + 1 })
     .eq("id", user.id)
-    .eq("first_access_used", false)
+    .eq("free_access_count", currentCount)
     .select("id")
     .maybeSingle();
 
   if (!updated) {
-    return res.status(403).json({ error: "Free access already used" });
+    return res.status(403).json({ error: "Free access limit reached" });
   }
 
   // Issue HMAC token (5 min TTL)
