@@ -65,8 +65,6 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
       const m: Meta = await res.json();
       setMeta(m);
 
-      const localUsed  = localStorage.getItem("trnpk_welcomed") === "1";
-
       // Check Supabase session
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
@@ -83,7 +81,10 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
           setCredentialId(profile.passkey_credential_id ?? null);
           await loadBalance(profile.wallet_address);
         }
-        if ((profile?.free_access_count ?? 0) >= 3) localStorage.setItem("trnpk_welcomed", "1");
+
+        // Free access: only for logged-in users with < 3 uses in DB
+        const count = profile?.free_access_count ?? 0;
+        setFreeEligible(count < 3);
 
         // Check if user has already paid for this slug
         const { purchased } = await fetch(
@@ -92,8 +93,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         ).then(r => r.json()).catch(() => ({ purchased: false }));
         setAlreadyPurchased(purchased);
       }
-
-      setFreeEligible(!localUsed);
+      // Not logged in → no free access
       setStep("show");
     } catch {
       setErr("Could not load content."); setStep("error");
