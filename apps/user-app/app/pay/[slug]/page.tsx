@@ -89,7 +89,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
 
         // Check if user has already paid for this slug
         const { purchased } = await fetch(
-          `${BACKEND_URL}/api/purchases/check?slug=${encodeURIComponent(p.slug)}`,
+          `${BACKEND_URL}/api/purchases/check?slug=${encodeURIComponent(slug!)}`,
           { headers: { Authorization: `Bearer ${session.access_token}` } }
         ).then(r => r.json()).catch(() => ({ purchased: false }));
         setAlreadyPurchased(purchased);
