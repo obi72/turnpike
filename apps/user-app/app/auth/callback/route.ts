@@ -6,6 +6,11 @@ const BACKEND = process.env.BACKEND_URL ?? "https://turnpike-production.up.railw
 export async function GET(request: Request) {
   const url  = new URL(request.url);
   const code = url.searchParams.get("code");
+  const next = url.searchParams.get("next");
+
+  // Validate next to prevent open redirects — only allow relative paths
+  const redirectTo = next?.startsWith("/") ? next : "/dashboard";
+
   if (code) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.exchangeCodeForSession(code);
@@ -17,5 +22,5 @@ export async function GET(request: Request) {
       }).catch(() => {});
     }
   }
-  return NextResponse.redirect(new URL("/dashboard", request.url));
+  return NextResponse.redirect(new URL(redirectTo, request.url));
 }

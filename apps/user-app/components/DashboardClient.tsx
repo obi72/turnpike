@@ -12,6 +12,7 @@ interface Profile {
   email: string;
   is_publisher: boolean;
   wallet_address: string | null;
+  passkey_credential_id: string | null;
   suspended: boolean;
 }
 
@@ -53,7 +54,7 @@ export default function DashboardClient({
         </div>
       </div>
 
-      <WalletCard userId={user.id} userEmail={user.email ?? ""} walletAddress={profile?.wallet_address ?? null} />
+      <WalletCard userId={user.id} userEmail={user.email ?? ""} walletAddress={profile?.wallet_address ?? null} credentialId={profile?.passkey_credential_id ?? null} />
 
       {!profile?.is_publisher && (
         <PublisherBanner userId={user.id} walletAddress={profile?.wallet_address ?? null} />

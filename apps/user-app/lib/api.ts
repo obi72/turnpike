@@ -35,6 +35,9 @@ export const api = {
   deletePayLink: (slug: string, ownerId: string) =>
     apiFetch(`/paylinks/${slug}`, { method: "DELETE", body: JSON.stringify({ ownerId }) }),
 
+  updatePayLink: (slug: string, ownerId: string, description: string, price?: number) =>
+    apiFetch(`/paylinks/${slug}`, { method: "PATCH", body: JSON.stringify({ ownerId, description, price }) }),
+
   stripeOnrampSession: (walletAddress: string, amount: number) =>
     apiFetch("/stripe/onramp-session", { method: "POST", body: JSON.stringify({ walletAddress, amount }) }),
 

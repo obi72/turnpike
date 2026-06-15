@@ -40,6 +40,9 @@ export default {
       if (resource === "stats" && request.method === "GET")
         return withCors(await handleStats(env));
 
+      if (resource === "revenue" && request.method === "GET")
+        return withCors(await handleRevenue(env));
+
       if (resource === "users" && !id && request.method === "GET")
         return withCors(await handleListUsers(request, env));
 
@@ -95,6 +98,50 @@ async function supabase(env, path, options = {}) {
     throw new Error(`Supabase ${path}: ${res.status} ${text}`);
   }
   return res;
+}
+
+// ── Revenue ────────────────────────────────────────────────────
+async function handleRevenue(env) {
+  const [purchasesRes, contentRes, usersRes] = await Promise.all([
+    supabase(env, "/purchases?select=slug,user_id,paid_at"),
+    supabase(env, "/content?select=slug,price_units,owner_id"),
+    supabase(env, "/users?select=id,email"),
+  ]);
+  const purchases = await purchasesRes.json();
+  const content   = await contentRes.json();
+  const users     = await usersRes.json();
+
+  const contentBySlug = Object.fromEntries(content.map(c => [c.slug, c]));
+  const userById      = Object.fromEntries(users.map(u => [u.id, u.email]));
+
+  function calcFee(priceUnits) {
+    return priceUnits < 100_000 ? 10_000 : Math.round(priceUnits * 0.10);
+  }
+
+  let totalRevenue = 0, totalFee = 0;
+  const byPublisher = {};
+
+  for (const p of purchases) {
+    const c = contentBySlug[p.slug];
+    if (!c) continue;
+    const price = c.price_units;
+    const fee   = calcFee(price);
+    totalRevenue += price;
+    totalFee     += fee;
+    const ownerId = c.owner_id;
+    if (!byPublisher[ownerId]) {
+      byPublisher[ownerId] = { email: userById[ownerId] ?? ownerId, revenue: 0, fee: 0, sales: 0 };
+    }
+    byPublisher[ownerId].revenue += price;
+    byPublisher[ownerId].fee     += fee;
+    byPublisher[ownerId].sales   += 1;
+  }
+
+  return Response.json({
+    totalRevenue,
+    totalFee,
+    byPublisher: Object.values(byPublisher).sort((a, b) => b.revenue - a.revenue),
+  });
 }
 
 // ── Stats ──────────────────────────────────────────────────────
@@ -182,7 +229,7 @@ async function handleUserDetail(userId, env) {
       slug, fileName: r.fileName, fileSize: r.fileSize,
       price: r.price, createdAt: r.createdAt,
       daysUntilDelete: Math.max(0, 30 - daysSince),
-      payUrl: `https://pay.trnpk.net/${slug}`,
+      payUrl: `https://trnpk.net/${slug}`,
     };
   }));
 

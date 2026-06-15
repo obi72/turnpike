@@ -66,6 +66,7 @@ function URLForm({ userId, walletAddress }: { userId: string; walletAddress: str
   const [result, setResult]       = useState<any>(null);
   const [error, setError]         = useState<string | null>(null);
   const [loading, setLoading]     = useState(false);
+  const [titleError, setTitleError] = useState(false);
 
   // Show computed fee alongside price input
   const priceNum   = parseFloat(price) || 0;
@@ -75,6 +76,7 @@ function URLForm({ userId, walletAddress }: { userId: string; walletAddress: str
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!description.trim()) { setTitleError(true); return; }
     if (!walletAddress) { setError("Wallet not ready. Refresh and try again."); return; }
     if (priceUnits < MIN_PRICE_UNITS) { setError("Minimum price is $0.02"); return; }
 
@@ -104,7 +106,7 @@ function URLForm({ userId, walletAddress }: { userId: string; walletAddress: str
           {result.payUrl}
         </div>
         <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 20 }}>
-          You receive {result.display.provider} per purchase · {result.display.feeLabel} platform fee
+          You receive {result.display.provider} per purchase · {result.display.feeLabel} fee
         </p>
         <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
           <button className="btn-primary" onClick={() => navigator.clipboard.writeText(result.payUrl)}>
@@ -144,7 +146,7 @@ function URLForm({ userId, walletAddress }: { userId: string; walletAddress: str
         />
         {feeInfo && (
           <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4 }}>
-            You receive ${feeInfo.youGet.toFixed(4).replace(/\.?0+$/, "")} · {feeInfo.feeLabel} platform fee
+            You receive ${feeInfo.youGet.toFixed(4).replace(/\.?0+$/, "")} · {feeInfo.feeLabel} fee
           </p>
         )}
         {priceUnits > 0 && priceUnits < MIN_PRICE_UNITS && (
@@ -154,13 +156,17 @@ function URLForm({ userId, walletAddress }: { userId: string; walletAddress: str
 
       <div>
         <label style={{ fontSize: 12, color: "var(--text-2)", display: "block", marginBottom: 6 }}>
-          Description (optional)
+          Title
         </label>
         <input
           type="text" value={description}
           placeholder="Premium article, monthly report…"
-          onChange={e => setDesc(e.target.value)}
+          onChange={e => { setDesc(e.target.value); setTitleError(false); }}
+          style={{ borderColor: titleError ? "var(--danger)" : undefined }}
         />
+        {titleError && (
+          <p style={{ fontSize: 11, color: "var(--danger)", marginTop: 3 }}>Title is required</p>
+        )}
       </div>
 
       {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}

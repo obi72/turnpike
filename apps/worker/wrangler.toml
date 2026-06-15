@@ -6,11 +6,8 @@ compatibility_date = "2025-01-01"
 FACILITATOR_URL = "https://facilitator.cdp.coinbase.com"
 BACKEND_URL     = "https://turnpike-production.up.railway.app"
 PLATFORM_WALLET = "0xE3221578f28C02c71D4F372ed1EAB7c1A33fB87e"
-CDP_KEY_ID      = "851347fa-4539-453a-bd41-b121e0710cc5"
-CDP_PROJECT_ID  = "b21f5d9b-ac81-4bc0-9573-aa7e57ea38e8"
 
 # Secrets (set via CLI — never commit):
-#   wrangler secret put CDP_API_KEY
 #   wrangler secret put ADMIN_SECRET
 
 [[kv_namespaces]]
@@ -25,5 +22,5 @@ bucket_name = "turnpike-files"
 crons = ["0 3 * * *"]
 
 [[routes]]
-pattern   = "pay.trnpk.net/*"
+pattern   = "trnpk.net/*"
 zone_name = "trnpk.net"

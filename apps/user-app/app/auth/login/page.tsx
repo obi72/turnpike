@@ -2,41 +2,28 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase-client";
-import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const supabase = createClient();
-  const router   = useRouter();
 
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [notice, setNotice]     = useState<string | null>(null);
-  const [error, setError]       = useState<string | null>(null);
-  const [loading, setLoading]   = useState(false);
+  const [email, setEmail]     = useState("");
+  const [sent, setSent]       = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSendLink(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setNotice(null);
-    setLoading(true);
-    try {
-      if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        setNotice("Check your email to confirm your account, then sign in.");
-        setLoading(false);
-        return;
-      }
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      router.push("/dashboard");
-      router.refresh();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true); setError(null);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: `${location.origin}/auth/callback`,
+      },
+    });
+    if (error) { setError(error.message); setLoading(false); return; }
+    setSent(true);
+    setLoading(false);
   }
 
   async function handleGoogle() {
@@ -54,44 +41,39 @@ export default function LoginPage() {
         border: "1px solid var(--border)",
       }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 4 }}>
-          {isSignUp ? "Create account" : "Sign in"}
+          {sent ? "Check your inbox" : "Sign in to Turnpike"}
         </h1>
         <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 24 }}>
-          {isSignUp ? "Start buying and selling content instantly." : "Welcome back."}
+          {sent
+            ? `We sent a sign-in link to ${email}. Click it to continue.`
+            : "Enter your email — we'll send you a sign-in link."}
         </p>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <input
-            type="email" placeholder="Email" value={email} required
-            onChange={e => setEmail(e.target.value)}
-          />
-          <input
-            type="password" placeholder="Password" value={password} required minLength={8}
-            onChange={e => setPassword(e.target.value)}
-          />
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? "…" : isSignUp ? "Create account" : "Sign in"}
+        {!sent ? (
+          <>
+            <form onSubmit={handleSendLink} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <input
+                type="email" placeholder="you@example.com"
+                value={email} required autoFocus
+                onChange={e => setEmail(e.target.value)}
+              />
+              <button type="submit" className="btn-primary" disabled={loading || !email}>
+                {loading ? "Sending…" : "Send link"}
+              </button>
+            </form>
+            <div style={{ margin: "16px 0", textAlign: "center", fontSize: 12, color: "var(--text-3)" }}>or</div>
+            <button className="btn-ghost" style={{ width: "100%" }} onClick={handleGoogle}>
+              Continue with Google
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn-ghost" style={{ fontSize: 13, width: "100%" }}
+            onClick={() => { setSent(false); setError(null); }}>
+            ← Different email
           </button>
-        </form>
+        )}
 
-        <div style={{ margin: "16px 0", textAlign: "center", fontSize: 12, color: "var(--text-3)" }}>or</div>
-
-        <button className="btn-ghost" style={{ width: "100%" }} onClick={handleGoogle}>
-          Continue with Google
-        </button>
-
-        {notice && <p style={{ marginTop: 12, fontSize: 13, color: "var(--success)" }}>{notice}</p>}
-        {error  && <p style={{ marginTop: 12, fontSize: 13, color: "var(--danger)" }}>{error}</p>}
-
-        <p style={{ marginTop: 16, fontSize: 12, color: "var(--text-2)", textAlign: "center" }}>
-          {isSignUp ? "Already have an account?" : "New here?"}{" "}
-          <button
-            style={{ background: "none", padding: 0, color: "var(--accent)", fontSize: 12, border: "none" }}
-            onClick={() => { setIsSignUp(!isSignUp); setError(null); setNotice(null); }}
-          >
-            {isSignUp ? "Sign in" : "Create account"}
-          </button>
-        </p>
+        {error && <p style={{ marginTop: 12, fontSize: 13, color: "var(--danger)" }}>{error}</p>}
       </div>
     </div>
   );

@@ -11,21 +11,21 @@ interface Props {
   userId: string;
   userEmail: string;
   walletAddress: string | null;
+  credentialId?: string | null;
 }
 
-export default function WalletCard({ userId, userEmail, walletAddress }: Props) {
+export default function WalletCard({ userId, userEmail, walletAddress, credentialId }: Props) {
   const router = useRouter();
   const { setupWallet, loading: connecting, error: walletError } = usePasskeyWallet();
 
-  const [balance, setBalance]             = useState<number | null>(null);
-  const [loading, setLoading]             = useState(false);
-  const [onrampLoading, setOnrampLoading] = useState(false);
-  const [onrampError, setOnrampError]     = useState<string | null>(null);
+  const [balance, setBalance]               = useState<number | null>(null);
+  const [loading, setLoading]               = useState(false);
+  const [onrampLoading, setOnrampLoading]   = useState(false);
+  const [onrampError, setOnrampError]       = useState<string | null>(null);
   const [offrampLoading, setOfframpLoading] = useState(false);
-  const [offrampError, setOfframpError]   = useState<string | null>(null);
-  const [widgetUrl, setWidgetUrl]   = useState<string | null>(null);
-  const [widgetTitle, setWidgetTitle] = useState<string>("");
-
+  const [offrampError, setOfframpError]     = useState<string | null>(null);
+  const [widgetUrl, setWidgetUrl]           = useState<string | null>(null);
+  const [widgetTitle, setWidgetTitle]       = useState<string>("");
   useEffect(() => {
     if (walletAddress) loadBalance();
   }, [walletAddress]);
@@ -128,7 +128,7 @@ export default function WalletCard({ userId, userEmail, walletAddress }: Props) 
           {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
         </p>
 
-        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+<div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
           <button className="btn-primary" style={{ fontSize: 13 }}
             onClick={handleAddFunds} disabled={onrampLoading}>
             {onrampLoading ? "Opening…" : "+ Add funds"}

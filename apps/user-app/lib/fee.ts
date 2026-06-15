@@ -13,6 +13,6 @@ export const MIN_PRICE_UNITS = 20_000; // $0.02 in USDC units
 export function calcFee(priceUsd: number): { youGet: number; fee: number; feeLabel: string } | null {
   if (priceUsd < MIN_PRICE) return null;
   const fee      = priceUsd < THRESHOLD ? FLAT_FEE : priceUsd * PCT_FEE;
-  const feeLabel = priceUsd < THRESHOLD ? "$0.01" : "10%";
+  const feeLabel = priceUsd < THRESHOLD ? "$0.01 fee" : "10% fee";
   return { youGet: priceUsd - fee, fee, feeLabel };
 }

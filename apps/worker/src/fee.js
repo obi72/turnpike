@@ -26,11 +26,11 @@ export function calculateFee(priceUnits) {
   if (priceUnits < THRESHOLD_UNITS) {
     // $0.02–$0.09: flat $0.01 fee
     platformFee = FLAT_FEE_UNITS;
-    feeLabel    = "$0.01";
+    feeLabel    = "$0.01 fee";
   } else {
     // $0.10+: 10%
     platformFee = Math.round(priceUnits * PERCENT_FEE);
-    feeLabel    = "10%";
+    feeLabel    = "10% fee";
   }
 
   const providerAmount = priceUnits - platformFee;

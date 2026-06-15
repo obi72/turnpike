@@ -15,6 +15,7 @@ export default function FileUpload({ userId, walletAddress }: Props) {
   const [result, setResult]       = useState<any>(null);
   const [error, setError]         = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [titleError, setTitleError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const priceNum   = parseFloat(price) || 0;
@@ -24,6 +25,7 @@ export default function FileUpload({ userId, walletAddress }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!description.trim()) { setTitleError(true); return; }
     if (!file) { setError("Please select a file."); return; }
     if (!walletAddress) { setError("Wallet not ready. Refresh and try again."); return; }
     if (file.size > 50 * 1024 * 1024) { setError("File too large. Maximum 50 MB."); return; }
@@ -122,18 +124,22 @@ export default function FileUpload({ userId, walletAddress }: Props) {
         />
         {feeInfo && (
           <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4 }}>
-            You receive ${feeInfo.youGet.toFixed(4).replace(/\.?0+$/, "")} · {feeInfo.feeLabel} platform fee
+            You receive ${feeInfo.youGet.toFixed(4).replace(/\.?0+$/, "")} · {feeInfo.feeLabel}
           </p>
         )}
       </div>
 
       <div>
-        <label style={{ fontSize: 12, color: "var(--text-2)", display: "block", marginBottom: 6 }}>Description (optional)</label>
+        <label style={{ fontSize: 12, color: "var(--text-2)", display: "block", marginBottom: 6 }}>Title</label>
         <input
           type="text" value={description}
           placeholder={file?.name ?? "My report, dataset…"}
-          onChange={e => setDesc(e.target.value)}
+          onChange={e => { setDesc(e.target.value); setTitleError(false); }}
+          style={{ borderColor: titleError ? "var(--danger)" : undefined }}
         />
+        {titleError && (
+          <p style={{ fontSize: 11, color: "var(--danger)", marginTop: 3 }}>Title is required</p>
+        )}
       </div>
 
       {uploading && (
