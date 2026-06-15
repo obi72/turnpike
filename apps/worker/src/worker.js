@@ -14,7 +14,6 @@ import { calculateFee } from "./fee.js";
 // USDC contract address on Base
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
-const CDP_BASE          = "https://api.cdp.coinbase.com/platform/v1";
 const MAX_FILE_SIZE     = 50 * 1024 * 1024;  // 50 MB
 const DOWNLOAD_TTL_DAYS = 30;
 const INACTIVITY_DAYS   = 60;
@@ -24,8 +23,11 @@ export default {
     const url  = new URL(request.url);
     const path = url.pathname;
 
+    if (path === "/") return Response.redirect("https://app.trnpk.net", 301);
+
     if (path === "/api/routes"              && request.method === "POST")   return handleCreateRoute(request, env);
     if (path === "/api/routes"              && request.method === "GET")    return handleListRoutes(request, env);
+    if (path.startsWith("/api/routes/")     && request.method === "PATCH")  return handleUpdateRoute(request, env);
     if (path === "/api/files/upload"        && request.method === "POST")   return handleUpload(request, env);
     if (path === "/api/files/limit"         && request.method === "GET")    return handleLimitCheck(request, env);
     if (path.startsWith("/api/files/")      && request.method === "GET")    return handleFileMeta(request, env);
@@ -165,7 +167,27 @@ async function handleCreateRoute(request, env) {
   await updateOwnerIndex(ownerId, slug, env);
   await updateOwnerActivity(ownerId, env);
 
-  return Response.json({ ok: true, payUrl: `https://pay.trnpk.net/${slug}`, splitterAddress, display: fee.display });
+  return Response.json({ ok: true, payUrl: `https://trnpk.net/${slug}`, splitterAddress, display: fee.display });
+}
+
+// ── Update URL pay link (description) ─────────────────────────
+async function handleUpdateRoute(request, env) {
+  if (!checkAuth(request, env)) return new Response("Unauthorized", { status: 401 });
+  const slug = new URL(request.url).pathname.replace("/api/routes/", "");
+  const raw  = await env.ROUTES.get(slug);
+  if (!raw) return Response.json({ error: "Not found" }, { status: 404 });
+  const route = JSON.parse(raw);
+  const { description, price } = await request.json();
+  if (description !== undefined) route.description = description;
+  if (price !== undefined) {
+    let fee;
+    try { fee = calculateFee(parseInt(price)); }
+    catch (e) { return Response.json({ error: e.message }, { status: 400 }); }
+    route.price      = String(price);
+    route.platformFee = fee.platformFee;
+  }
+  await env.ROUTES.put(slug, JSON.stringify(route));
+  return Response.json({ ok: true });
 }
 
 // ── Upload file ────────────────────────────────────────────────
@@ -204,7 +226,7 @@ async function handleUpload(request, env) {
     customMetadata: { ownerId, originalName: file.name, price, fileSize: file.size.toString() },
   });
 
-  const slug = await uniqueSlug(Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10), env);
+  const slug = await uniqueSlug(randomSlug(), env);
   const splitterAddress = formData.get("splitterAddress") ?? providerWallet;
 
   const route = {
@@ -217,7 +239,7 @@ async function handleUpload(request, env) {
   await updateOwnerIndex(ownerId, slug, env);
   await updateOwnerActivity(ownerId, env);
 
-  return Response.json({ ok: true, slug, payUrl: `https://pay.trnpk.net/${slug}`, fileId, fileName: file.name, display: fee.display });
+  return Response.json({ ok: true, slug, payUrl: `https://trnpk.net/${slug}`, fileId, fileName: file.name, display: fee.display });
 }
 
 // ── File limit check ───────────────────────────────────────────
@@ -250,7 +272,7 @@ async function handleFileMeta(request, env) {
   const route = JSON.parse(raw);
   const daysSince = route.lastDownload ? Math.floor((Date.now() - route.lastDownload) / 86400000) : 999;
   const daysUntilDelete = Math.max(0, DOWNLOAD_TTL_DAYS - daysSince);
-  return Response.json({ slug, fileName: route.fileName, fileSize: route.fileSize, price: route.price, payUrl: `https://pay.trnpk.net/${slug}`, daysUntilDelete });
+  return Response.json({ slug, fileName: route.fileName, fileSize: route.fileSize, price: route.price, payUrl: `https://trnpk.net/${slug}`, daysUntilDelete });
 }
 
 async function handleDeleteFile(request, env) {
@@ -289,7 +311,9 @@ async function handleListRoutes(request, env) {
       fileSize: r.fileSize, price: fee.display.price, providerGets: fee.display.provider,
       feeLabel: fee.display.feeLabel, createdAt: r.createdAt,
       daysUntilDelete: r.type === "file" ? Math.max(0, DOWNLOAD_TTL_DAYS - daysSince) : null,
-      payUrl: `https://pay.trnpk.net/${slug}`,
+      payUrl: `https://trnpk.net/${slug}`,
+      secretUrl: r.secretUrl ?? null,
+      priceUnits: parseInt(r.price),
     };
   }));
   return Response.json(routes.filter(Boolean));
@@ -392,34 +416,6 @@ async function triggerSplit(splitterAddress, env) {
   }
 }
 
-// ── Splitter wallet ────────────────────────────────────────────
-async function createSplitterWallet({ providerWallet, priceUnits, platformFee, env }) {
-  const providerPct = Math.round(((priceUnits - platformFee) / priceUnits) * 100);
-  const platformPct = 100 - providerPct;
-
-  try {
-    const walletRes = await cdpFetch(`${CDP_BASE}/wallets`, "POST", { wallet: { network_id: "base-mainnet" } }, env);
-    if (!walletRes.ok) throw new Error(`CDP ${walletRes.status}`);
-    const wallet = await walletRes.json();
-    if (!wallet?.default_address?.address_id) throw new Error("CDP response missing address");
-    const splitterAddress = wallet.default_address.address_id;
-
-    await cdpFetch(`${CDP_BASE}/wallets/${wallet.id}/webhook_rules`, "POST", {
-      event_type: "erc20_transfer", asset: "usdc", trigger: "on_receive",
-      actions: [
-        { type: "transfer", to: providerWallet,      percentage: providerPct, asset: "usdc", network_id: "base-mainnet" },
-        { type: "transfer", to: env.PLATFORM_WALLET, percentage: platformPct, asset: "usdc", network_id: "base-mainnet" },
-      ],
-    }, env);
-
-    return splitterAddress;
-  } catch (err) {
-    // CDP not configured yet — payments go directly to provider (no platform split)
-    console.error("Splitter wallet creation failed, using provider wallet directly:", err.message);
-    return providerWallet;
-  }
-}
-
 // ── Daily cleanup ──────────────────────────────────────────────
 async function runCleanup(env) {
   const now = Date.now();
@@ -496,6 +492,12 @@ function slugify(name) {
   return name.replace(/\.[^.]+$/, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 60);
 }
 
+function randomSlug() {
+  const chars = "0123456789abcdefghijklmnopqrstuvwxyz";
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  return Array.from(bytes).map(b => chars[b % 36]).join("");
+}
+
 async function uniqueSlug(base, env) {
   let slug = base;
   let i = 1;
@@ -509,47 +511,3 @@ function checkAuth(request, env) {
   return request.headers.get("Authorization") === `Bearer ${env.ADMIN_SECRET}`;
 }
 
-function b64url(input) {
-  let b64;
-  if (input instanceof ArrayBuffer) {
-    b64 = btoa(String.fromCharCode(...new Uint8Array(input)));
-  } else {
-    b64 = btoa(input);
-  }
-  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-}
-
-async function makeCdpJwt(method, url, env) {
-  const keyData = Uint8Array.from(atob(env.CDP_API_KEY), c => c.charCodeAt(0));
-  const privateKey = await crypto.subtle.importKey(
-    "pkcs8", keyData.buffer,
-    { name: "ECDSA", namedCurve: "P-256" },
-    false, ["sign"]
-  );
-  const now = Math.floor(Date.now() / 1000);
-  const { host, pathname } = new URL(url);
-  const keyName = `organizations/${env.CDP_PROJECT_ID}/apiKeys/${env.CDP_KEY_ID}`;
-  const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2,'0')).join('');
-  const header  = b64url(JSON.stringify({ alg: "ES256", kid: keyName, typ: "JWT", nonce }));
-  const payload = b64url(JSON.stringify({
-    sub: keyName, iss: "cdp",
-    nbf: now, exp: now + 120, iat: now,
-    uris: [`${method} ${host}${pathname}`],
-  }));
-  const sigInput = `${header}.${payload}`;
-  const sig = await crypto.subtle.sign(
-    { name: "ECDSA", hash: "SHA-256" },
-    privateKey,
-    new TextEncoder().encode(sigInput)
-  );
-  return `${sigInput}.${b64url(sig)}`;
-}
-
-async function cdpFetch(url, method, body, env) {
-  const jwt = await makeCdpJwt(method, url, env);
-  return fetch(url, {
-    method,
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-}

@@ -60,7 +60,10 @@ router.post("/paylinks", async (req, res) => {
     .single();
   const splitterAddress = userProfile?.splitter_address ?? providerWallet;
 
-  const slug = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+  const SLUG_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz";
+  const SLUG_LEN   = 6;
+  const slugArr    = Array.from(crypto.getRandomValues(new Uint8Array(SLUG_LEN)));
+  const slug       = slugArr.map(b => SLUG_CHARS[b % 36]).join("");
 
   try {
     const result = await createPayLink({ slug, secretUrl, price, description, ownerId, providerWallet, splitterAddress });
