@@ -29,6 +29,9 @@ export const api = {
   getPayLinks: (ownerId: string) =>
     apiFetch(`/paylinks?ownerId=${ownerId}`),
 
+  getSlots: (ownerId: string) =>
+    apiFetch(`/paylinks/slots?ownerId=${ownerId}`),
+
   createPayLink: (data: { secretUrl: string; price: string; description?: string; ownerId: string; providerWallet: string }) =>
     apiFetch("/paylinks", { method: "POST", body: JSON.stringify(data) }),
 

@@ -44,6 +44,14 @@ router.post("/files/upload", upload.single("file"), async (req: any, res) => {
   res.status(workerRes.status).json(data);
 });
 
+router.get("/paylinks/slots", async (req, res) => {
+  const { ownerId } = req.query as { ownerId: string };
+  if (!ownerId) return res.status(400).json({ error: "ownerId required" });
+  const workerRes = await workerFetch(`/api/files/limit?ownerId=${ownerId}`);
+  if (!workerRes.ok) return res.status(500).json({ error: "Worker error" });
+  res.json(await workerRes.json());
+});
+
 router.post("/paylinks", async (req, res) => {
   const parsed = CreateLinkSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { calcFee, MIN_PRICE_UNITS } from "@/lib/fee";
+import { api } from "@/lib/api";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://api.trnpk.net";
 
@@ -9,6 +10,7 @@ interface Props { userId: string; walletAddress: string | null; }
 
 export default function FileUpload({ userId, walletAddress }: Props) {
   const [file, setFile]           = useState<File | null>(null);
+  const [slots, setSlots]         = useState<{ count: number; max: number } | null>(null);
   const [price, setPrice]         = useState("0.10");
   const [description, setDesc]    = useState("");
   const [progress, setProgress]   = useState(0);
@@ -17,6 +19,12 @@ export default function FileUpload({ userId, walletAddress }: Props) {
   const [uploading, setUploading] = useState(false);
   const [titleError, setTitleError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    api.getSlots(userId)
+      .then(d => setSlots({ count: d.count, max: d.max }))
+      .catch(() => {});
+  }, [userId]);
 
   const priceNum   = parseFloat(price) || 0;
   const priceUnits = Math.round(priceNum * 1_000_000);
@@ -86,6 +94,11 @@ export default function FileUpload({ userId, walletAddress }: Props) {
 
   return (
     <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {slots && (
+        <p style={{ fontSize: 12, color: slots.count >= slots.max ? "var(--danger)" : "var(--text-3)", textAlign: "right" }}>
+          {slots.count} / {slots.max} uploads used
+        </p>
+      )}
       {/* Drop zone */}
       <div
         onClick={() => inputRef.current?.click()}
