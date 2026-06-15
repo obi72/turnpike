@@ -78,6 +78,26 @@ router.post("/paylinks", async (req, res) => {
   }
 });
 
+router.patch("/paylinks/:slug", async (req, res) => {
+  const { slug } = req.params;
+  const { ownerId, description } = req.body;
+  if (!ownerId) return res.status(400).json({ error: "ownerId required" });
+
+  const workerRes = await workerFetch(`/api/routes/${slug}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ description: description ?? "" }),
+  });
+  if (!workerRes.ok) return res.status(500).json({ error: "Worker update failed" });
+
+  await supabase.from("content")
+    .update({ description: description ?? "" })
+    .eq("slug", slug)
+    .eq("owner_id", ownerId);
+
+  res.json({ ok: true });
+});
+
 router.delete("/paylinks/:slug", async (req, res) => {
   const { slug } = req.params;
   const { ownerId } = req.body;
