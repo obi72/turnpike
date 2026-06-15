@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase-client";
 export default function LoginPage() {
   const supabase = createClient();
 
+  const [mode, setMode]       = useState<"signin" | "signup">("signin");
   const [email, setEmail]     = useState("");
   const [sent, setSent]       = useState(false);
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,10 @@ export default function LoginPage() {
     });
   }
 
+  function switchMode(m: "signin" | "signup") {
+    setMode(m); setError(null); setSent(false);
+  }
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{
@@ -40,17 +45,44 @@ export default function LoginPage() {
         background: "var(--bg-2)", borderRadius: "var(--radius)",
         border: "1px solid var(--border)",
       }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 4 }}>
-          {sent ? "Check your inbox" : "Sign in to Turnpike"}
-        </h1>
-        <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 24 }}>
-          {sent
-            ? `We sent a sign-in link to ${email}. Click it to continue.`
-            : "Enter your email — we'll send you a sign-in link."}
-        </p>
+        {/* Tab toggle */}
+        <div style={{ display: "flex", marginBottom: 24, borderBottom: "1px solid var(--border)" }}>
+          {(["signin", "signup"] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => switchMode(m)}
+              style={{
+                flex: 1, padding: "10px 0", fontSize: 14, fontWeight: mode === m ? 600 : 400,
+                background: "transparent", border: "none", cursor: "pointer",
+                color: mode === m ? "var(--text-1)" : "var(--text-3)",
+                borderBottom: mode === m ? "2px solid var(--text-1)" : "2px solid transparent",
+                marginBottom: -1,
+              }}
+            >
+              {m === "signin" ? "Sign in" : "Create account"}
+            </button>
+          ))}
+        </div>
 
-        {!sent ? (
+        {sent ? (
           <>
+            <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Check your inbox</h1>
+            <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 24 }}>
+              We sent a link to {email}. Click it to continue.
+            </p>
+            <button type="button" className="btn-ghost" style={{ fontSize: 13, width: "100%" }}
+              onClick={() => { setSent(false); setError(null); }}>
+              ← Different email
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 20 }}>
+              {mode === "signin"
+                ? "Enter your email — we'll send you a sign-in link."
+                : "Enter your email to create a free account."}
+            </p>
+
             <form onSubmit={handleSendLink} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <input
                 type="email" placeholder="you@example.com"
@@ -61,16 +93,12 @@ export default function LoginPage() {
                 {loading ? "Sending…" : "Send link"}
               </button>
             </form>
+
             <div style={{ margin: "16px 0", textAlign: "center", fontSize: 12, color: "var(--text-3)" }}>or</div>
             <button className="btn-ghost" style={{ width: "100%" }} onClick={handleGoogle}>
               Continue with Google
             </button>
           </>
-        ) : (
-          <button type="button" className="btn-ghost" style={{ fontSize: 13, width: "100%" }}
-            onClick={() => { setSent(false); setError(null); }}>
-            ← Different email
-          </button>
         )}
 
         {error && <p style={{ marginTop: 12, fontSize: 13, color: "var(--danger)" }}>{error}</p>}
