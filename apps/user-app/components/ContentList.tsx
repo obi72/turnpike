@@ -185,31 +185,33 @@ export default function ContentList({ ownerId }: { ownerId: string }) {
 
                   <div style={{ display: "flex", gap: 6 }}>
                     <button
-                      className="btn-primary"
-                      style={{ fontSize: 12, padding: "5px 12px" }}
-                      onClick={() => saveEdit(link)}
-                      disabled={saving}
-                    >
-                      {saving ? "Saving…" : "Save"}
-                    </button>
-                    <button
-                      className="btn-ghost"
-                      style={{ fontSize: 12, padding: "5px 12px" }}
-                      onClick={cancelEdit}
-                      disabled={saving}
-                    >
-                      Cancel
-                    </button>
-                    <button
                       onClick={() => deleteLink(link.slug)}
                       style={{
-                        marginLeft: "auto", fontSize: 12, padding: "5px 10px",
+                        fontSize: 12, padding: "5px 10px",
                         background: "transparent", border: "1px solid var(--danger)",
                         borderRadius: "var(--radius-sm)", color: "var(--danger)", cursor: "pointer",
                       }}
                     >
                       Delete
                     </button>
+                    <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                      <button
+                        className="btn-ghost"
+                        style={{ fontSize: 12, padding: "5px 12px" }}
+                        onClick={cancelEdit}
+                        disabled={saving}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="btn-primary"
+                        style={{ fontSize: 12, padding: "5px 12px" }}
+                        onClick={() => saveEdit(link)}
+                        disabled={saving}
+                      >
+                        {saving ? "Saving…" : "Save"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
