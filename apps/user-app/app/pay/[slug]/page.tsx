@@ -353,7 +353,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         <div onClick={() => { setWidgetUrl(null); setStep("show"); }}
           style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ background: "var(--bg-1)", borderRadius: "var(--radius)", overflow: "hidden", width: "100%", maxWidth: 480, maxHeight: "90vh", boxShadow: "0 24px 64px rgba(0,0,0,0.4)", display: "flex", flexDirection: "column" }}>
+            style={{ background: "var(--bg-1)", borderRadius: "var(--radius)", overflow: "hidden", width: "100%", maxWidth: 480, height: "90vh", boxShadow: "0 24px 64px rgba(0,0,0,0.4)", display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>Add Funds</span>
               <button onClick={() => { setWidgetUrl(null); setStep("show"); }}

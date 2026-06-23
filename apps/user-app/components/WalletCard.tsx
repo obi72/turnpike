@@ -160,7 +160,7 @@ export default function WalletCard({ userId, userEmail, walletAddress, credentia
             style={{
               background: "var(--bg-1)", borderRadius: "var(--radius)",
               overflow: "hidden", width: "100%", maxWidth: 480,
-              maxHeight: "90vh",
+              height: "90vh",
               boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
               display: "flex", flexDirection: "column",
             }}
