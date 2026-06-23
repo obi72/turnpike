@@ -155,8 +155,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         setStep("done");
       } else {
         const { url } = await contentRes.json();
-        setContentUrl(url);
-        setStep("done");
+        window.location.href = url;
       }
     } catch (e: any) {
       setErr(e.message); setStep("show");
@@ -232,8 +231,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         setStep("done");
       } else {
         const { url } = await res.json();
-        setContentUrl(url);
-        setStep("done");
+        window.location.href = url;
       }
 
       if (accessToken && slug) {
@@ -276,8 +274,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         setStep("done");
       } else {
         const { url } = await contentRes.json();
-        setContentUrl(url);
-        setStep("done");
+        window.location.href = url;
       }
     } catch (e: any) {
       setErr(e.message); setStep("show");
