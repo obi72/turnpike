@@ -84,7 +84,7 @@ router.post("/transak/onramp-session", async (req, res) => {
       walletAddress,
       email:                    email ?? "",
       fiatCurrency:             "USD",
-      fiatAmount:               amount,
+      defaultFiatAmount:        amount,
       paymentMethodId:          "credit_debit_card",
       themeColor:               "000000",
       redirectURL:              "https://app.trnpk.net/dashboard",
