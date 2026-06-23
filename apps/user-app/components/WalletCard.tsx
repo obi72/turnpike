@@ -35,6 +35,12 @@ export default function WalletCard({ userId, userEmail, walletAddress, credentia
     if (!widgetUrl && walletAddress) loadBalance();
   }, [widgetUrl]);
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = widgetUrl ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [widgetUrl]);
+
   async function loadBalance() {
     if (!walletAddress) return;
     setLoading(true);
