@@ -73,7 +73,7 @@ async function createTransakSession(widgetParams: Record<string, any>): Promise<
 
 // Add Funds — onramp (fiat → crypto)
 router.post("/transak/onramp-session", async (req, res) => {
-  const { walletAddress, email, amount = 10 } = req.body;
+  const { walletAddress, email, amount = 5 } = req.body;
   if (!walletAddress) return res.status(400).json({ error: "walletAddress required" });
 
   try {
@@ -83,8 +83,9 @@ router.post("/transak/onramp-session", async (req, res) => {
       network:                  "base",
       walletAddress,
       email:                    email ?? "",
-      fiatCurrency:             "EUR",
+      fiatCurrency:             "USD",
       fiatAmount:               amount,
+      paymentMethodId:          "credit_debit_card",
       themeColor:               "000000",
       redirectURL:              "https://app.trnpk.net/dashboard",
       disableWalletAddressForm: true,
