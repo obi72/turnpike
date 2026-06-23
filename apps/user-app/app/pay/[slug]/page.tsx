@@ -22,14 +22,13 @@ type Meta = {
 
 type Step =
   | "loading"
-  | "show"         // show content info + CTA
-  | "login"        // email input
-  | "check-email"  // magic link sent, waiting for click
-  | "wallet"       // WebAuthn setup
-  | "getting"     // fetching free content
-  | "paying"      // signing + sending payment
-  | "add-funds"   // Transak modal
-  | "done"        // content delivered
+  | "show"
+  | "check-email"
+  | "wallet"
+  | "getting"
+  | "paying"
+  | "add-funds"
+  | "done"
   | "error";
 
 export default function PayPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -37,20 +36,21 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
   const supabase  = createBrowserClient(SUPABASE_URL, ANON_KEY);
   const { setupWallet, signPayment, startSession, hasSession, loading: walletBusy, error: walletErr } = usePasskeyWallet();
 
-  const [meta, setMeta]               = useState<Meta | null>(null);
-  const [step, setStep]               = useState<Step>("loading");
-  const [freeEligible, setFreeEligible] = useState(false);
+  const [meta, setMeta]                     = useState<Meta | null>(null);
+  const [step, setStep]                     = useState<Step>("loading");
+  const [freeEligible, setFreeEligible]     = useState(false);
+  const [freeRemaining, setFreeRemaining]   = useState(0);
   const [alreadyPurchased, setAlreadyPurchased] = useState(false);
-  const [email, setEmail]             = useState("");
-  const [userId, setUserId]           = useState<string | null>(null);
-  const [userEmail, setUserEmail]     = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [contentUrl, setContentUrl]   = useState<string | null>(null);
-  const [credentialId, setCredentialId] = useState<string | null>(null);
-  const [balance, setBalance]         = useState<number | null>(null);
-  const [widgetUrl, setWidgetUrl]     = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [err, setErr]                 = useState<string | null>(null);
+  const [email, setEmail]                   = useState("");
+  const [userId, setUserId]                 = useState<string | null>(null);
+  const [userEmail, setUserEmail]           = useState<string | null>(null);
+  const [walletAddress, setWalletAddress]   = useState<string | null>(null);
+  const [contentUrl, setContentUrl]         = useState<string | null>(null);
+  const [credentialId, setCredentialId]     = useState<string | null>(null);
+  const [balance, setBalance]               = useState<number | null>(null);
+  const [widgetUrl, setWidgetUrl]           = useState<string | null>(null);
+  const [accessToken, setAccessToken]       = useState<string | null>(null);
+  const [err, setErr]                       = useState<string | null>(null);
 
   useEffect(() => {
     params.then(p => setSlug(p.slug));
@@ -65,7 +65,12 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
       const m: Meta = await res.json();
       setMeta(m);
 
-      // Check Supabase session
+      // Free access: device-based via localStorage — no account required
+      const freeCount = parseInt(localStorage.getItem("trnpk_free_count") ?? "0", 10);
+      setFreeEligible(freeCount < 3);
+      setFreeRemaining(Math.max(0, 3 - freeCount));
+
+      // Check Supabase session (needed for paid flow only)
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUserId(session.user.id);
@@ -73,7 +78,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         setAccessToken(session.access_token);
         const { data: profile } = await supabase
           .from("users")
-          .select("wallet_address, passkey_credential_id, free_access_count")
+          .select("wallet_address, passkey_credential_id")
           .eq("id", session.user.id)
           .single();
         if (profile?.wallet_address) {
@@ -82,18 +87,12 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
           await loadBalance(profile.wallet_address);
         }
 
-        // Free access: only for logged-in users with < 3 uses in DB
-        const count = profile?.free_access_count ?? 0;
-        setFreeEligible(count < 3);
-
-        // Check if user has already paid for this slug
         const { purchased } = await fetch(
           `${BACKEND_URL}/api/purchases/check?slug=${encodeURIComponent(slug!)}`,
           { headers: { Authorization: `Bearer ${session.access_token}` } }
         ).then(r => r.json()).catch(() => ({ purchased: false }));
         setAlreadyPurchased(purchased);
       }
-      // Not logged in → no free access
       setStep("show");
     } catch {
       setErr("Could not load content."); setStep("error");
@@ -109,17 +108,72 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
     } catch { setBalance(0); }
   }
 
+  // ── Free access flow (no login needed) ───────────────────────
+  async function startFreeFlow() {
+    await claimFree();
+  }
+
+  async function claimFree() {
+    setStep("getting"); setErr(null);
+
+    let deviceId = localStorage.getItem("trnpk_device_id");
+    if (!deviceId) {
+      deviceId = crypto.randomUUID();
+      localStorage.setItem("trnpk_device_id", deviceId);
+    }
+
+    try {
+      const tokenRes = await fetch(`${BACKEND_URL}/api/free-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, deviceId }),
+      });
+      if (!tokenRes.ok) {
+        const e = await tokenRes.json();
+        throw new Error(e.error ?? "Free access unavailable.");
+      }
+      const { token, userId: uid } = await tokenRes.json();
+
+      const contentRes = await fetch(`${WORKER_URL}/api/free-content/${slug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, userId: uid }),
+      });
+      if (!contentRes.ok) throw new Error("Could not retrieve content.");
+
+      // Increment device counter
+      const newCount = parseInt(localStorage.getItem("trnpk_free_count") ?? "0", 10) + 1;
+      localStorage.setItem("trnpk_free_count", String(newCount));
+      localStorage.setItem("trnpk_welcomed", "1");
+
+      if (meta?.type === "file") {
+        const blob = await contentRes.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href = url; a.download = meta.fileName ?? "download"; a.click();
+        URL.revokeObjectURL(url);
+        setStep("done");
+      } else {
+        const { url } = await contentRes.json();
+        setContentUrl(url);
+        setStep("done");
+      }
+    } catch (e: any) {
+      setErr(e.message); setStep("show");
+    }
+  }
+
   // ── Paid access flow ──────────────────────────────────────────
   function redirectToLogin() {
     if (!slug || !meta) return;
     const returning = !!localStorage.getItem("trnpk_welcomed");
-    const params = new URLSearchParams({
+    const p = new URLSearchParams({
       next:  `/pay/${slug}`,
       mode:  returning ? "signin" : "signup",
       title: meta.description,
       price: meta.display.price,
     });
-    window.location.href = `/auth/login?${params}`;
+    window.location.href = `/auth/login?${p}`;
   }
 
   async function startPaidFlow() {
@@ -129,20 +183,18 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
     await executePaidPayment(session.access_token);
   }
 
-  async function executePaidPayment(accessToken: string) {
+  async function executePaidPayment(token: string) {
     if (!meta || !walletAddress || !credentialId || !slug) return;
     setStep("paying"); setErr(null);
 
     const price = parseInt(meta.price);
 
-    // Check balance
     await loadBalance(walletAddress);
     if ((balance ?? 0) < price / 1e6) {
-      // Need to top up first
       try {
         const res = await fetch(`${BACKEND_URL}/api/onramp/onramp-session`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
           body: JSON.stringify({ walletAddress, email: userEmail }),
         });
         if (res.ok) {
@@ -154,7 +206,6 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
       return;
     }
 
-    // Sign payment
     const paymentHeader = await signPayment({
       splitterAddress: meta.splitterAddress,
       price,
@@ -162,7 +213,6 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
     });
     if (!paymentHeader) { setStep("show"); return; }
 
-    // Fetch content with X-Payment header
     try {
       const res = await fetch(`${WORKER_URL}/${slug}`, {
         headers: { "X-Payment": paymentHeader, "Accept": "application/json" },
@@ -186,7 +236,6 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
         setStep("done");
       }
 
-      // Record purchase so user can access for free next time
       if (accessToken && slug) {
         await fetch(`${BACKEND_URL}/api/purchases`, {
           method: "POST",
@@ -235,34 +284,6 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
     }
   }
 
-  // ── Free access flow ─────────────────────────────────────────
-  async function startFreeFlow() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { redirectToLogin(); return; }
-    if (!walletAddress) { setStep("wallet"); return; }
-    await claimFree(session.access_token);
-  }
-
-  async function handleLogin() {
-    setErr(null);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/pay/${slug}`,
-      },
-    });
-    if (error) { setErr(error.message); return; }
-    setStep("check-email");
-  }
-
-  async function handleGoogleLogin() {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/pay/${slug}` },
-    });
-  }
-
   async function handleWalletSetup() {
     if (!userEmail) return;
     const result = await setupWallet(userEmail);
@@ -273,54 +294,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
     }).catch(() => {});
     setWalletAddress(result.address);
     const { data: { session } } = await supabase.auth.getSession();
-    if (freeEligible) {
-      await claimFree(session!.access_token);
-    } else {
-      await executePaidPayment(session!.access_token);
-    }
-  }
-
-  async function claimFree(accessToken: string) {
-    setStep("getting"); setErr(null);
-    try {
-      // Get signed token from backend
-      const tokenRes = await fetch(`${BACKEND_URL}/api/free-access`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
-        body: JSON.stringify({ slug }),
-      });
-      if (!tokenRes.ok) {
-        const e = await tokenRes.json();
-        throw new Error(e.error ?? "Free access unavailable.");
-      }
-      const { token, userId: uid } = await tokenRes.json();
-
-      // Fetch content from worker
-      const contentRes = await fetch(`${WORKER_URL}/api/free-content/${slug}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, userId: uid }),
-      });
-      if (!contentRes.ok) throw new Error("Could not retrieve content.");
-
-      // Mark device as used
-      localStorage.setItem("trnpk_welcomed", "1");
-
-      if (meta?.type === "file") {
-        const blob = await contentRes.blob();
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement("a");
-        a.href = url; a.download = meta.fileName ?? "download"; a.click();
-        URL.revokeObjectURL(url);
-        setStep("done");
-      } else {
-        const { url } = await contentRes.json();
-        setContentUrl(url);
-        setStep("done");
-      }
-    } catch (e: any) {
-      setErr(e.message); setStep("show");
-    }
+    await executePaidPayment(session!.access_token);
   }
 
   // ── Render ───────────────────────────────────────────────────
@@ -396,43 +370,6 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
     </>
   );
 
-  if (step === "login") return (
-    <div style={card}>
-      <p style={{ ...label }}>Step 1 of 2</p>
-      <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Enter your email</p>
-      <input
-        type="email" value={email} onChange={e => setEmail(e.target.value)}
-        placeholder="you@example.com"
-        onKeyDown={e => e.key === "Enter" && handleLogin()}
-        style={{ width: "100%", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--bg-1)", color: "var(--text-1)", fontSize: 14, boxSizing: "border-box", marginBottom: 10 }}
-      />
-      {err && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{err}</p>}
-      <button className="btn-primary" style={{ width: "100%" }} onClick={handleLogin}>Send link</button>
-      <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-        <span style={{ fontSize: 12, color: "var(--text-3)" }}>or</span>
-        <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-      </div>
-      <button className="btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={handleGoogleLogin}>
-        Continue with Google
-      </button>
-    </div>
-  );
-
-  if (step === "check-email") return (
-    <div style={card}>
-      <p style={{ ...label }}>Step 1 of 2</p>
-      <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Check your inbox</p>
-      <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 20, lineHeight: 1.5 }}>
-        We sent a sign-in link to <strong>{email}</strong>. Click it to continue.
-      </p>
-      <button className="btn-ghost" style={{ width: "100%", fontSize: 13 }}
-        onClick={() => { setStep("login"); setErr(null); }}>
-        ← Different email
-      </button>
-    </div>
-  );
-
   if (step === "wallet") return (
     <div style={card}>
       <p style={{ ...label }}>Step 2 of 2</p>
@@ -442,7 +379,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
       </p>
       {walletErr && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{walletErr}</p>}
       <button className="btn-primary" style={{ width: "100%" }} onClick={handleWalletSetup} disabled={walletBusy}>
-        {walletBusy ? "Opening…" : "Set up & get access"}
+        {walletBusy ? "Opening…" : "Set up & continue"}
       </button>
     </div>
   );
@@ -451,13 +388,20 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
   return (
     <div style={card}>
       {freeEligible && (
-        <div style={{
-          background: "var(--accent)", color: "#fff",
-          fontSize: 11, fontWeight: 700, letterSpacing: "0.06em",
-          textTransform: "uppercase", padding: "4px 10px",
-          borderRadius: 20, display: "inline-block", marginBottom: 16,
-        }}>
-          Free for new users
+        <div style={{ marginBottom: 16 }}>
+          <div style={{
+            background: "var(--accent)", color: "#fff",
+            fontSize: 11, fontWeight: 700, letterSpacing: "0.06em",
+            textTransform: "uppercase", padding: "4px 10px",
+            borderRadius: 20, display: "inline-block", marginBottom: 6,
+          }}>
+            Free
+          </div>
+          <p style={{ fontSize: 12, color: "var(--text-3)", margin: 0 }}>
+            {freeRemaining === 3
+              ? "3 free accesses available"
+              : `${freeRemaining} free access${freeRemaining !== 1 ? "es" : ""} remaining`}
+          </p>
         </div>
       )}
 
