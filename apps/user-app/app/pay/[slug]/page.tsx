@@ -112,9 +112,10 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
   // ── Paid access flow ──────────────────────────────────────────
   function redirectToLogin() {
     if (!slug || !meta) return;
+    const returning = !!localStorage.getItem("trnpk_welcomed");
     const params = new URLSearchParams({
       next:  `/pay/${slug}`,
-      mode:  "signup",
+      mode:  returning ? "signin" : "signup",
       title: meta.description,
       price: meta.display.price,
     });
