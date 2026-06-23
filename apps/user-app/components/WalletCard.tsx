@@ -150,48 +150,25 @@ export default function WalletCard({ userId, userEmail, walletAddress, credentia
         {offrampError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{offrampError}</p>}
       </div>
 
-      {/* Onramp/Offramp iFrame Modal */}
+      {/* Onramp/Offramp iFrame — full-screen overlay */}
       {widgetUrl && (
-        <div
-          onClick={() => setWidgetUrl(null)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 1000,
-            background: "rgba(0,0,0,0.7)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 16, overflow: "hidden",
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000 }}>
+          <iframe
+            src={widgetUrl}
+            style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+            allow="camera; microphone; payment"
+          />
+          <button
+            onClick={() => setWidgetUrl(null)}
             style={{
-              background: "var(--bg-1)", borderRadius: "var(--radius)",
-              overflow: "hidden", width: "100%", maxWidth: 480,
-              height: "90vh",
-              boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
-              display: "flex", flexDirection: "column",
+              position: "absolute", top: 16, right: 16,
+              background: "rgba(0,0,0,0.6)", color: "#fff",
+              border: "none", borderRadius: "50%",
+              width: 32, height: 32, fontSize: 18, lineHeight: "32px",
+              cursor: "pointer", textAlign: "center", padding: 0,
             }}
-          >
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "14px 16px", borderBottom: "1px solid var(--border)",
-              flexShrink: 0,
-            }}>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{widgetTitle}</span>
-              <button
-                onClick={() => setWidgetUrl(null)}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  fontSize: 20, color: "var(--text-3)", lineHeight: 1, padding: 0,
-                }}
-                title="Close"
-              >×</button>
-            </div>
-            <iframe
-              src={widgetUrl}
-              style={{ width: "100%", flex: 1, minHeight: 0, border: "none", display: "block" }}
-              allow="camera; microphone; payment"
-            />
-          </div>
+            title="Close"
+          >×</button>
         </div>
       )}
     </>
