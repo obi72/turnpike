@@ -160,6 +160,7 @@ export default function WalletCard({ userId, userEmail, walletAddress, credentia
             style={{
               background: "var(--bg-1)", borderRadius: "var(--radius)",
               overflow: "hidden", width: "100%", maxWidth: 480,
+              maxHeight: "90vh",
               boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
               display: "flex", flexDirection: "column",
             }}
@@ -167,6 +168,7 @@ export default function WalletCard({ userId, userEmail, walletAddress, credentia
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "14px 16px", borderBottom: "1px solid var(--border)",
+              flexShrink: 0,
             }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>{widgetTitle}</span>
               <button
@@ -180,7 +182,7 @@ export default function WalletCard({ userId, userEmail, walletAddress, credentia
             </div>
             <iframe
               src={widgetUrl}
-              style={{ width: "100%", height: 620, border: "none", display: "block" }}
+              style={{ width: "100%", flex: 1, minHeight: 0, border: "none", display: "block" }}
               allow="camera; microphone; payment"
             />
           </div>
