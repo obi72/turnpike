@@ -1,26 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase-client";
 
 export default function LoginPage() {
-  const supabase = createClient();
+  const supabase     = createClient();
+  const searchParams = useSearchParams();
+  const next         = searchParams.get("next") ?? "/dashboard";
+  const initMode     = searchParams.get("mode") === "signup" ? "signup" : "signin";
+  const ctxTitle     = searchParams.get("title");
+  const ctxPrice     = searchParams.get("price");
 
-  const [mode, setMode]       = useState<"signin" | "signup">("signin");
-  const [email, setEmail]     = useState("");
-  const [sent, setSent]       = useState(false);
+  const [mode, setMode]   = useState<"signin" | "signup">(initMode);
+  const [email, setEmail] = useState("");
+  const [sent, setSent]   = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const callbackUrl = `${typeof location !== "undefined" ? location.origin : ""}/auth/callback?next=${encodeURIComponent(next)}`;
 
   async function handleSendLink(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true); setError(null);
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${location.origin}/auth/callback`,
-      },
+      options: { shouldCreateUser: true, emailRedirectTo: callbackUrl },
     });
     if (error) { setError(error.message); setLoading(false); return; }
     setSent(true);
@@ -30,7 +35,7 @@ export default function LoginPage() {
   async function handleGoogle() {
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl },
     });
   }
 
@@ -45,6 +50,19 @@ export default function LoginPage() {
         background: "var(--bg-2)", borderRadius: "var(--radius)",
         border: "1px solid var(--border)",
       }}>
+
+        {/* Content context — shown when coming from a pay link */}
+        {ctxTitle && ctxPrice && (
+          <div style={{
+            background: "var(--bg-3)", borderRadius: "var(--radius-sm)",
+            padding: "10px 14px", marginBottom: 20, fontSize: 13,
+          }}>
+            <p style={{ color: "var(--text-3)", fontSize: 11, marginBottom: 2 }}>Getting access to</p>
+            <p style={{ fontWeight: 600 }}>{ctxTitle}</p>
+            <p style={{ color: "var(--text-2)" }}>{ctxPrice}</p>
+          </div>
+        )}
+
         {/* Tab toggle */}
         <div style={{ display: "flex", marginBottom: 24, borderBottom: "1px solid var(--border)" }}>
           {(["signin", "signup"] as const).map(m => (
@@ -102,6 +120,14 @@ export default function LoginPage() {
         )}
 
         {error && <p style={{ marginTop: 12, fontSize: 13, color: "var(--danger)" }}>{error}</p>}
+
+        {/* Publisher CTA */}
+        <p style={{ marginTop: 28, textAlign: "center", fontSize: 12, color: "var(--text-3)" }}>
+          Want to sell your content, too?{" "}
+          <a href="/coming-soon" style={{ color: "var(--text-2)", textDecoration: "underline" }}>
+            Learn more
+          </a>
+        </p>
       </div>
     </div>
   );

@@ -110,9 +110,20 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
   }
 
   // ── Paid access flow ──────────────────────────────────────────
+  function redirectToLogin() {
+    if (!slug || !meta) return;
+    const params = new URLSearchParams({
+      next:  `/pay/${slug}`,
+      mode:  "signup",
+      title: meta.description,
+      price: meta.display.price,
+    });
+    window.location.href = `/auth/login?${params}`;
+  }
+
   async function startPaidFlow() {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setStep("login"); return; }
+    if (!session) { redirectToLogin(); return; }
     if (!walletAddress) { setStep("wallet"); return; }
     await executePaidPayment(session.access_token);
   }
@@ -226,7 +237,7 @@ export default function PayPage({ params }: { params: Promise<{ slug: string }> 
   // ── Free access flow ─────────────────────────────────────────
   async function startFreeFlow() {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setStep("login"); return; }
+    if (!session) { redirectToLogin(); return; }
     if (!walletAddress) { setStep("wallet"); return; }
     await claimFree(session.access_token);
   }
