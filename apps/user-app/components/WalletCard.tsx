@@ -152,7 +152,7 @@ export default function WalletCard({ userId, userEmail, walletAddress, credentia
             position: "fixed", inset: 0, zIndex: 1000,
             background: "rgba(0,0,0,0.7)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 16,
+            padding: 16, overflow: "hidden",
           }}
         >
           <div
